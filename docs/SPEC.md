@@ -162,12 +162,13 @@ query API; no consistent license; no update-frequency or temporal-coverage field
 **Goals**
 1. Full mirror of catalogue metadata (all package dicts) to local storage.
 2. Cheap incremental refresh (only changed packages), scheduled.
-3. Optional, filtered download of resource files (by org, format, size).
+3. Download resource files (best resource per dataset by default; filters by org, format, size) and **best-effort extraction into tables** with a quality grade. See [FEASIBILITY.md](FEASIBILITY.md): ~70% of files are reachable, and ~55–65% of datasets yield a usable table automatically.
 4. A web UI for **1–10 internal users** to browse, search, filter, and inspect the mirror, and to see fetch-run status.
 5. Be a polite client of a government service.
 
 **Non-goals (v1)**
-- Parsing or normalising the contents of resource files (CSV/XLSX → tables). The UI may preview the first rows of a downloaded CSV, nothing more.
+- Harmonising the same indicator across regions into one comparable table (needs manual curation).
+- Fetching WMS/WFS geodata (kept as links), OCR of scanned PDFs.
 - A public API, multi-tenant accounts, or horizontal scaling.
 - Scraping the Next.js HTML; the proxy API is enough.
 
@@ -262,6 +263,16 @@ Timestamps: CKAN returns naive ISO strings (`2026-06-17T08:23:12.600209`), which
 in CKAN. Store them as UTC and format Solr ranges as `YYYY-MM-DDTHH:MM:SSZ`.
 
 ### 3.3 `ResourceDownloader` (opt-in)
+
+Feasibility-driven rules (details in [FEASIBILITY.md](FEASIBILITY.md) §Design consequences):
+- **Pre-flight URL lint**: dot-less hosts (the West Java harvest leaks `http://api/...`), `localhost` and private IPs → `internal_host`, never requested.
+- **Sniff magic bytes** → `actual_type`; never trust the declared `format` or the `Content-Type` (~8% mismatch, mostly HTML landing pages).
+- **Error taxonomy** recorded per resource (`dns`, `connect_timeout`, `read_timeout`, `tls`, `http_4xx`, `http_5xx`, `html_landing`, `ogc_exception`, `internal_host`, `no_url`, `too_large`).
+- **Best resource per dataset** (CSV > JSON > XLSX > XLS > TSV > PDF), falling back to the next candidate on failure; `--all` downloads everything.
+- **Host health** with cross-run backoff (1d → 3d → 7d) for dead hosts.
+- Extraction (§3.4) runs after download and always keeps the raw file.
+
+General behaviour:
 - Input: a selection query over the store (`--org`, `--format`, `--harvest-source`, `--since`).
 - Per-host concurrency **1** and ≥1 s spacing; global cap 8. Origin hosts are small regional servers.
 - Streams to `data/files/<package_id>/<resource_id>/<sanitised filename>`. Writes to `*.part`, then renames.
@@ -269,7 +280,14 @@ in CKAN. Store them as UTC and format Solr ranges as `YYYY-MM-DDTHH:MM:SSZ`.
 - Re-downloads only when resource `metadata_modified` or `last_modified` changed, or with a conditional GET (`If-None-Match` / `If-Modified-Since`).
 - Size guard: skip > 500 MB by default (`--max-size`); `HEAD` first when the host supports it.
 - Dead links are expected. Record them, don't fail the run. Mark a host as down after N consecutive connection errors and skip it for the rest of the run.
-- TLS: some `.go.id` hosts have broken chains. Default is verify on. `--insecure-hosts` is an explicit allowlist, logged in the run record.
+- TLS: some `.go.id` hosts have broken chains (4% of successful downloads in the sample). Default is verify on. `--insecure-hosts` is an explicit allowlist, logged in the run record.
+
+### 3.4 `TableExtractor` (best-effort)
+- CSV: encoding sniff (utf-8-sig → cp1252), delimiter sniff (`, ; | \t`), `newline=''`.
+- JSON: record-list locator (`[...]`, `{data}`, `{records}`, `{fields,records}`, `{code,status,message,data}`, `{deskripsi,header,data}`, GeoJSON `features[].properties`).
+- XLSX/XLS: header-row detection, merged-header flattening (`Tahun / 2023`), dropping title and note rows, first sheet by default.
+- PDF (optional, PDF-only datasets): `pdfplumber`, ≤5 pages, no OCR.
+- Output: `data/tables/<resource_id>.parquet` + a `tables` row with quality **A** (tidy as-is), **B** (header fixed or merges flattened), or **C** (raw grid only).
 
 ---
 
@@ -298,7 +316,12 @@ resources(
 );
 organizations(id TEXT PRIMARY KEY, name TEXT, title TEXT, raw_json TEXT);  -- derived
 downloads(resource_id TEXT PRIMARY KEY, status INT, path TEXT, bytes INT,
-          sha256 TEXT, etag TEXT, last_modified TEXT, fetched_at TEXT, error TEXT);
+          sha256 TEXT, etag TEXT, last_modified TEXT, fetched_at TEXT,
+          actual_type TEXT, error_kind TEXT, error TEXT, insecure INT DEFAULT 0);
+host_health(host TEXT PRIMARY KEY, ok INT, fail INT, last_ok_at TEXT,
+            last_error_kind TEXT, consecutive_failed_runs INT, retry_after TEXT);
+tables(resource_id TEXT PRIMARY KEY, parser TEXT, path TEXT, n_rows INT, n_cols INT,
+       columns TEXT, sheets TEXT, quality TEXT, warnings TEXT, extracted_at TEXT);
 package_versions(package_id TEXT, content_hash TEXT, raw_json TEXT, seen_at TEXT,
                  PRIMARY KEY(package_id, content_hash));   -- history, only when the hash changes
 runs(id INTEGER PRIMARY KEY, kind TEXT, started_at TEXT, finished_at TEXT,
@@ -343,11 +366,12 @@ Server-rendered, HTMX for partial updates. Every list is paginated server-side
 
 | Page | Route | Content |
 |---|---|---|
-| Datasets | `GET /` | Search box (FTS5), filters: org type, organization, harvest source, resource format, `prioritas_tahun`, modified-since. Sort: relevance / recently modified / title. Result rows show title, org, formats, modified date, # resources. Filters and paging swap `#results` via HTMX and keep the URL query string shareable. |
-| Dataset detail | `GET /datasets/{name}` | Title, notes, org, tags, extras table, link to the origin portal (`url`) and to data.go.id. Resource table: name, normalised format, origin host, download status, local file link. For downloaded CSVs, a "Preview first 50 rows" HTMX panel. Version history from `package_versions` (date + changed fields). |
+| Datasets | `GET /` | Search box (FTS5), filters: has usable data (quality A/B), org type, organization, harvest source, resource format, `prioritas_tahun`, modified-since. Sort: relevance / recently modified / title. Result rows show title, org, formats, modified date, # resources. Filters and paging swap `#results` via HTMX and keep the URL query string shareable. |
+| Dataset detail | `GET /datasets/{name}` | Title, notes, org, tags, extras table, link to the origin portal (`url`) and to data.go.id. Resource table: name, normalised format, origin host, download status, local file link. Each resource also shows its download status and error kind, declared vs actual type, and a quality badge. A "Preview first 50 rows" HTMX panel reads from the extracted table. WMS/WFS resources render as "open in geoportal" links. Version history from `package_versions` (date + changed fields). |
 | Organizations | `GET /orgs` | Org list with dataset counts; click through to a filtered Datasets view. |
 | Runs | `GET /runs` | Table of `runs` (kind, start/finish, search/list/stored counts, upserts, changed, errors). The current run auto-refreshes every 5 s via `hx-trigger="every 5s"`. "Run incremental now" and "Run full now" buttons (POST, guarded by the run lock). |
 | Stats | `GET /stats` | Counts by org / harvest source / format, plus totals and last successful run. Plain tables first; charts are optional later. |
+| Link health | `GET /health/links` | Overall file success rate, breakdown by error kind, per-host success/backoff table, top failing publishers, declared-vs-actual format matrix. CSV export. |
 | Health | `GET /healthz` | JSON: DB reachable, last run status and age. For uptime checks. |
 
 Facet counts are computed with SQL `GROUP BY` over the filtered set and cached for

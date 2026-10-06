@@ -52,9 +52,14 @@ Definition of done for every slice: new tests written first and passing · `make
 | S15 | Orgs + Stats pages | ⬜ |
 | S16 | Runs page + "Run now" + scheduler | ⬜ |
 | S17 | Docker image + deploy docs + backup | ⬜ |
-| S18 | Resource downloader | ⬜ |
-| S19 | Downloads in UI + CSV preview | ⬜ |
-| S20 | Export (JSONL / Parquet) | ⬜ |
+| S18 | Downloader core: URL lint, sniffing, error taxonomy | ⬜ |
+| S19 | Best-resource selection + host health/backoff | ⬜ |
+| S20 | Table extraction: CSV + JSON | ⬜ |
+| S21 | Table extraction: XLSX/XLS (header detection, merged headers) | ⬜ |
+| S22 | Data in UI: quality badges, table preview, "has usable data" filter | ⬜ |
+| S23 | Link health page | ⬜ |
+| S24 | Export (JSONL / Parquet) | ⬜ |
+| S25 | *(optional)* PDF table extraction for PDF-only datasets | ⬜ |
 
 Legend: ⬜ todo · 🟨 in progress · ✅ done · ⛔ blocked
 
@@ -160,20 +165,72 @@ Legend: ⬜ todo · 🟨 in progress · ✅ done · ⛔ blocked
 **Build:** a multi-stage `Dockerfile` (uv, non-root user, `data/` volume), `docker-compose.yml`, `docs/DEPLOY.md` (VM and Fly.io options), and a nightly `sqlite3 .backup` job with retention. `make check` now also runs `docker build`.
 **Tests first:** the backup function produces a valid, openable copy and prunes beyond retention; a container smoke test (CI) gets `/healthz` = 200.
 
-### S18 — Resource downloader
+### S18 — Downloader core: URL lint, sniffing, error taxonomy
 - [ ] Done
-**Build:** `downloader.py` per SPEC §3.3: selection query, per-host limits, `.part` then rename, sha256, conditional GET, size guard, host circuit breaker, `insecure_hosts`, `download` CLI with `--dry-run`.
-**Tests first:** downloads and records hash and size; a 304 skips the rewrite; an over-size file is skipped (via HEAD and via a streaming cutoff); the per-host concurrency is never exceeded; a host is marked down after N failures; the dry run lists files without fetching.
+See [FEASIBILITY.md](FEASIBILITY.md). Expect ~28% of files to fail and ~8% of successful ones to be the wrong type.
+**Build:** `downloader.py` per SPEC §3.3, with:
+- **Pre-flight URL lint:** dot-less hosts (`api`, `tes`), `localhost`, and private/reserved IPs → `internal_host`, no request made.
+- Streaming download to `.part` then rename; sha256; size guard; conditional GET.
+- **Magic-byte sniffing** → `actual_type` (XLSX/XLS/PDF/ZIP/DOCX/JSON/XML/HTML/IMG/TEXT/EMPTY).
+- **Error taxonomy** in `downloads.error_kind`: `dns`, `connect_timeout`, `read_timeout`, `tls`, `http_4xx`, `http_5xx`, `html_landing`, `ogc_exception`, `internal_host`, `no_url`, `too_large`.
+- Per-host concurrency 1–2, global cap, `insecure_hosts` allowlist.
+- `download` CLI with `--dry-run`.
 
-### S19 — Downloads in UI + CSV preview
-- [ ] Done
-**Build:** download status and a local-file link in the detail page; a "Download selected" action under the run lock; an HTMX CSV preview of the first 50 rows (encoding sniffing and delimiter detection).
-**Tests first:** status badges per state; preview handles `;`-delimited and latin-1 files; preview refuses non-CSV files; serving a file stays inside `data/files` (path-traversal test).
+**Tests first:** URL lint table (`http://api/x` → internal; `http://10.0.0.1` → internal; `https://data.x.go.id` → ok); sniffing table using tiny fixture files (xlsx zip, xls OLE header, `%PDF`, HTML landing page, OGC `ServiceExceptionReport`, BOM CSV); each error kind is produced by its respx/httpx scenario; a TLS failure on a host outside the allowlist → `tls`, and on an allowlisted host → success flagged insecure; a 304 skips the rewrite; an over-size file is cut off; per-host concurrency is never exceeded.
 
-### S20 — Export ⇄ (parallel-safe with S18/S19)
+### S19 — Best-resource selection + host health
 - [ ] Done
-**Build:** `export --format jsonl|parquet` (`pyarrow`), one flat packages table plus one resources table.
+**Build:**
+- `select_best(package)` ranks resources CSV > JSON > XLSX > XLS > TSV > PDF > other, using `format_norm`, and **falls back to the next candidate** when the chosen one fails or sniffs as the wrong type.
+- `host_health` table with a rolling success rate and `retry_after`. A dead host is backed off across runs (1d → 3d → 7d).
+- `download --best-only` is the default; `--all` is opt-in.
+
+**Tests first:** ranking order; fallback when the CSV is a 404 → the XLSX is used; a dataset with only PDF/WMS selects PDF and skips geo; backoff progresses after consecutive failed runs and resets on success; a host in backoff is skipped without making a request.
+
+### S20 — Table extraction: CSV + JSON ⇄ (parallel-safe with S19)
+- [ ] Done
+**Build:** `extract/` package that writes `data/tables/<resource_id>.parquet` and a `tables` row (parser, rows, cols, columns JSON, quality A/B/C, warnings).
+- CSV: encoding sniff (utf-8-sig → cp1252 fallback), delimiter sniff (`, ; | \t`), `newline=''`, column-count consistency check.
+- JSON: record-list locator for `[...]`, `{data}`, `{records}`, `{fields,records}`, `{code,status,message,data}`, `{deskripsi,header,data}`, and GeoJSON `features[].properties`. Nested values are serialised as JSON strings.
+
+**Tests first:** fixtures for each wrapper shape and delimiter; a cp1252 file with Indonesian text; embedded newlines in quoted fields; inconsistent columns → quality C with a warning; a non-tabular JSON object → `no_table`.
+
+### S21 — Table extraction: XLSX/XLS
+- [ ] Done
+**Build:**
+- Header-row detection: first row whose filled-cell count is ≥60% of the widest row.
+- Merged-header flattening: forward-fill horizontal merges, then join levels (`Tahun / 2023`).
+- Drop title and note rows above the header and trailing note rows below the data.
+- First sheet by default; the other sheets are recorded in `tables.sheets`.
+- `.xls` is read via `xlrd`.
+- Quality: A = tidy as-is, B = header fixed or merges flattened, C = raw grid only.
+
+**Tests first:** small fixture workbooks built in-test with openpyxl: tidy table → A; title in rows 0–2 with the header on row 3 → B with the correct columns; a two-level merged header → flattened names; a trailing "Sumber: …" note row is dropped; a multi-sheet workbook lists its sheets; a corrupt file → quality C / error, not a crash.
+
+### S22 — Data in UI
+- [ ] Done
+**Build:**
+- Detail page: per-resource download status and error kind, `actual_type` vs declared format, quality badge, and an HTMX **table preview** (first 50 rows, from the extracted Parquet, falling back to the raw CSV), plus a raw-file download link.
+- Datasets list: a **"has usable data"** filter (quality A/B) and a quality badge in each row.
+- "Download selected" action under the run lock.
+- WMS/WFS resources render as "open in geoportal" links.
+
+**Tests first:** badges per state; the preview renders from Parquet; the preview falls back when there's no table; the filter narrows correctly; file serving stays inside `data/` (path-traversal test).
+
+### S23 — Link health page ⇄ (parallel-safe with S22)
+- [ ] Done
+**Build:** `GET /health/links`: overall success rate; breakdown by error kind; per-host table (success %, last ok, backoff state); top failing publishers; a declared-vs-actual format mismatch matrix. CSV export of the per-host table.
+**Tests first:** aggregates match the seeded `downloads` / `host_health` rows; sorting by failure rate works; the CSV export has the right columns.
+
+### S24 — Export
+- [ ] Done
+**Build:** `export --format jsonl|parquet` (`pyarrow`): a flat packages table, a resources table (with download and quality columns), and optionally `--with-tables` to bundle the extracted tables.
 **Tests first:** row counts match the store; the Parquet schema is stable; soft-deleted packages are excluded unless `--include-deleted` is passed.
+
+### S25 — *(optional)* PDF table extraction
+- [ ] Done
+**Build:** `pdfplumber` extraction **only for datasets with no machine-readable alternative** (~7%). Pages ≤ 5 by default. Scanned PDFs (no text layer) → `no_text_layer`; OCR is out of scope. Output goes through the same `tables` pipeline, with quality capped at B.
+**Tests first:** a generated 1-page table PDF → correct cells; a multi-table page → first table plus a warning; a PDF with no text layer → `no_text_layer`; skipped when the dataset has a CSV/XLSX.
 
 ---
 
