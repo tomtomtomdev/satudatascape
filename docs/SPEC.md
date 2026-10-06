@@ -75,7 +75,80 @@ Unknown paths return a Spring-style error with HTTP 404:
 - `datastore_active` is `false` on sampled resources, so there's no DataStore API to lean on.
 - `notes` may be truncated with `............` in search results; `package_show` returns the same text, so treat that as source data.
 
-### 1.5 Operational
+### 1.5 What data is available
+
+Snapshot taken 2026-10-06 from the facets the `/dataset` page renders server-side.
+These are **UI-side counts** (total 708,117). For the same filter, the API returns
+roughly 85–90% of these: `kota-malang` 92,941 in the UI vs 80,659 in the API; `XLSX`
+403,387 vs 367,877. Treat this table as a map of the catalogue, not as exact totals.
+
+**What a "dataset" is here:** a catalogue record (CKAN package) holding metadata and
+links to 1+ files on the publisher's own portal. data.go.id is an **aggregator**: it
+hosts metadata, not the data. Content is overwhelmingly **aggregated statistical
+tables** (counts and percentages per district, per year), not microdata or live APIs.
+
+**Who publishes (445 organizations).** It's dominated by local government:
+
+| Publisher type | Orgs | Datasets | Share |
+|---|---:|---:|---:|
+| Kabupaten (regency) | 261 | 382,649 | 54% |
+| Kota (city) | 71 | 226,994 | 32% |
+| Provinsi (province) | 31 | 81,778 | 12% |
+| Badan / lembaga (national agencies: BPS, BMKG, BNPB, BIG, BSSN, Badan Pangan, BPOM, BRIN …) | 38 | 9,111 | 1.3% |
+| Kementerian (ministries: Kesehatan, Keuangan, PUPR, ESDM, KKP, Perhubungan, Pendidikan …) | 39 | 5,992 | 0.8% |
+| Other | 5 | 1,593 | 0.2% |
+
+The largest single publishers are Kota Malang (92,941), Kota Semarang (31,117),
+Kab. Demak (29,112), Kab. Karanganyar (27,428), Kab. Musi Banyuasin (21,566),
+Kab. Bantul (15,299), DI Yogyakarta (15,290), and Kalimantan Barat (14,605).
+The top 10 publishers hold ~38% of everything. Coverage across the country is
+**very uneven**: many regencies publish nothing.
+
+**Resource formats (192 distinct raw values, ~947k resources):**
+
+| Format | Resources | Notes |
+|---|---:|---|
+| XLSX (+ `.xlsx`, `xlxs`, `xslx` …) | ~413k | The bulk; tables, often with merged-cell headers |
+| CSV (+ `.csv`) | ~244k | Most machine-friendly |
+| PDF | ~105k | Reports and scanned tables; not machine-readable |
+| XLS | ~63k | Legacy Excel |
+| JSON | ~43k | Often the origin portal's per-dataset API export |
+| WMS / WFS | ~18k / ~16k | Geospatial services (mostly BIG / provincial geoportals) |
+| XML, DOCX, HTML, TSV, JPEG, PNG, TXT, RDF, SHP … | <10k each | Long tail |
+
+**Topics.** Tags are free text (500+ distinct). Dominant themes:
+health (kesehatan, puskesmas, posyandu), education (pendidikan, sekolah),
+population (penduduk, kependudukan), agriculture/livestock/fisheries,
+regional finance (`SIPD`: 46k, from the Home Affairs regional-government info system),
+village SDGs (`SDGS_DESA_CANTIK`), social welfare, employment, infrastructure.
+The `kategori` facet (sectoral classification) covers only ~1k datasets and has
+inconsistent casing (`HUKUM` vs `Hukum`), so it's not useful for browsing.
+
+**Priority data.** `prioritas_tahun` marks national "Data Prioritas" for
+2022–2026 on ~3.5k datasets. Values are dirty (`"2023, 2024"`, `"2025;2026"`,
+`"Prioritas 2025"`, `"1970"`). Parse them into a set of years.
+
+**Temporal range.** Records were created from 2022-10 onward (`metadata_created`).
+~13k datasets were modified in the last 7 days, which is the expected size of a
+weekly incremental run.
+
+**Per-record metadata available** (CKAN package + harvest extras): title, notes
+(description, Indonesian), organization, tags, `url` (origin page), license (mostly empty),
+created/modified timestamps, `accesslevel` (e.g. `Terbatas` = restricted; the file
+may need a login on the origin portal), `dcat_publisher_name`, `dcat_issued`/`dcat_modified`,
+harvest source, and per-resource name/format/url/timestamps. Size and mimetype are almost always null.
+
+**What's *not* there:** no DataStore (`datastore_active: false`), so no row-level
+query API; no consistent license; no update-frequency or temporal-coverage field
+(the year is usually only in the title or tags); no file sizes.
+
+**Implications for the fetcher/UI**
+- The format, `prioritas_tahun`, and kategori normalisers are worth building; the raw values are noisy.
+- Org type (kabupaten/kota/provinsi/kementerian/badan) is derivable from the org `name` prefix. Add it as a UI filter.
+- Expect many duplicate-looking titles across regions (the same indicator per kabupaten). Search ranking should boost title matches and allow an org filter.
+- Downloading "everything" means ~950k files from ~400 origin hosts. Default to metadata only, with downloads by explicit selection.
+
+### 1.6 Operational
 
 - No auth required. No rate-limit headers. 12 concurrent requests → all 200.
 - `robots.txt`: `Allow: /`, `Disallow: /private/`; sitemap at `/sitemap.xml`.
@@ -88,13 +161,14 @@ Unknown paths return a Spring-style error with HTTP 404:
 
 **Goals**
 1. Full mirror of catalogue metadata (all package dicts) to local storage.
-2. Cheap incremental refresh (only changed packages).
+2. Cheap incremental refresh (only changed packages), scheduled.
 3. Optional, filtered download of resource files (by org, format, size).
-4. Be a polite client of a government service.
+4. A web UI for **1–10 internal users** to browse, search, filter, and inspect the mirror, and to see fetch-run status.
+5. Be a polite client of a government service.
 
 **Non-goals (v1)**
-- Parsing or normalising the contents of resource files (CSV/XLSX → tables).
-- A UI or public API on top of the mirror.
+- Parsing or normalising the contents of resource files (CSV/XLSX → tables). The UI may preview the first rows of a downloaded CSV, nothing more.
+- A public API, multi-tenant accounts, or horizontal scaling.
 - Scraping the Next.js HTML; the proxy API is enough.
 
 ---
@@ -112,9 +186,45 @@ Unknown paths return a Spring-style error with HTTP 404:
           └──────────────┘        └──────────────┘
 ```
 
-Language: **Python 3.12**, `httpx` (async), `tenacity` for retries, `sqlite3`,
-`typer` for the CLI, `pytest` + `respx` for tests. (Swap if you'd rather use Go/TS;
-nothing in the design depends on Python.)
+### 3.0 Tech stack (sized for 1–10 users)
+
+At this scale the right shape is **one process, one file-based DB, one container**.
+There's no need for Postgres, a queue, a separate SPA, or Kubernetes.
+
+| Concern | Choice | Why |
+|---|---|---|
+| Language / tooling | **Python 3.12**, `uv` (deps + venv), `ruff` (lint + format), `mypy` | One language for fetcher and UI; `uv` keeps builds fast and reproducible. |
+| HTTP client | `httpx` (async) + `tenacity` | Async paging with retries; `respx` mocks it cleanly in tests. |
+| Database | **SQLite** (WAL) + **FTS5** full-text index on title/notes/org/tags | ~614k rows and ~2–3 GB fit easily. FTS5 gives fast Indonesian keyword search with no extra service. WAL lets the UI read while the crawler writes. |
+| DB access | stdlib `sqlite3` + hand-written SQL, numbered `migrations/*.sql` | The schema is small. An ORM would add more than it saves. |
+| Web | **FastAPI** + **Jinja2** server-rendered templates + **HTMX** | Server-rendered pages with partial updates (filters, paging, run status) and no JS build step. One codebase, one deploy. |
+| CSS | **Pico.css** (classless) via CDN, plus a small `app.css` | Decent default look with zero build tooling. |
+| Scheduling | **APScheduler** inside the web process (daily incremental at 02:00 WIB, weekly reconcile) + a "Run now" button | No cron or worker infra. A DB lock row prevents overlapping runs. |
+| CLI | `typer` | Same code paths as the scheduler, for ops and backfills. |
+| Auth | Single shared login via HTTP Basic, or put it behind Tailscale / Cloudflare Access | 1–10 trusted users. The data is public anyway; auth just keeps the "Run now" button private. |
+| Tests | `pytest`, `pytest-asyncio`, `respx`, FastAPI `TestClient`, recorded JSON fixtures | Fully offline test suite. |
+| Packaging / deploy | Single **Docker** image; run on a small VM (1 vCPU / 1–2 GB RAM, 20 GB disk) or Fly.io/Railway **with a persistent volume** for `data/` | SQLite needs a real disk, so use a volume. Back up with a nightly `sqlite3 .backup`, or Litestream to S3/R2. |
+| CI | GitHub Actions: `ruff check`, `mypy`, `pytest`, `docker build` | Same commands as the local `make check`. |
+
+**When to outgrow this:** more than ~10 concurrent writers, multiple app instances, or analytical queries over file contents. At that point, move to Postgres (keep SQL portable now: no SQLite-only types except FTS5, which is isolated behind a `search` module) and a separate worker process.
+
+Single-process layout:
+
+```
+satudatascape/
+  client.py        # ProxyClient
+  crawler.py       # full / incremental / reconcile
+  downloader.py    # resource files
+  store.py         # sqlite access, upsert, FTS
+  scheduler.py     # APScheduler jobs + run lock
+  cli.py           # typer
+  web/
+    app.py         # FastAPI routes
+    templates/     # Jinja2 (+ HTMX partials)
+    static/app.css
+migrations/0001_init.sql …
+tests/ (unit, fixtures/, web/)
+```
 
 ### 3.1 `ProxyClient`
 - `action(name: str, **params) -> dict`: builds `endpoint`, posts the envelope, unwraps `result`.
@@ -171,6 +281,8 @@ in CKAN. Store them as UTC and format Solr ranges as `YYYY-MM-DDTHH:MM:SSZ`.
 packages(
   id TEXT PRIMARY KEY, name TEXT UNIQUE, title TEXT,
   org_id TEXT, org_name TEXT,
+  org_type TEXT,                     -- kabupaten|kota|provinsi|kementerian|badan|other (from name prefix)
+  prioritas_years TEXT,              -- normalised JSON array, e.g. [2023,2024]
   harvest_source_id TEXT, harvest_source_title TEXT,
   metadata_created TEXT, metadata_modified TEXT,
   num_resources INT, private INT, state TEXT,
@@ -219,6 +331,27 @@ satudatascape stats                        # counts by org / harvest source / fo
 ```
 
 Global flags: `--db`, `--concurrency`, `--rps`, `--log-format json|text`.
+
+Plus `satudatascape serve [--host 0.0.0.0 --port 8000]`, which starts the web UI and the scheduler.
+
+---
+
+## 5b. Web UI
+
+Server-rendered, HTMX for partial updates. Every list is paginated server-side
+(50/page), so no page ever loads more than one page of rows.
+
+| Page | Route | Content |
+|---|---|---|
+| Datasets | `GET /` | Search box (FTS5), filters: org type, organization, harvest source, resource format, `prioritas_tahun`, modified-since. Sort: relevance / recently modified / title. Result rows show title, org, formats, modified date, # resources. Filters and paging swap `#results` via HTMX and keep the URL query string shareable. |
+| Dataset detail | `GET /datasets/{name}` | Title, notes, org, tags, extras table, link to the origin portal (`url`) and to data.go.id. Resource table: name, normalised format, origin host, download status, local file link. For downloaded CSVs, a "Preview first 50 rows" HTMX panel. Version history from `package_versions` (date + changed fields). |
+| Organizations | `GET /orgs` | Org list with dataset counts; click through to a filtered Datasets view. |
+| Runs | `GET /runs` | Table of `runs` (kind, start/finish, search/list/stored counts, upserts, changed, errors). The current run auto-refreshes every 5 s via `hx-trigger="every 5s"`. "Run incremental now" and "Run full now" buttons (POST, guarded by the run lock). |
+| Stats | `GET /stats` | Counts by org / harvest source / format, plus totals and last successful run. Plain tables first; charts are optional later. |
+| Health | `GET /healthz` | JSON: DB reachable, last run status and age. For uptime checks. |
+
+Facet counts are computed with SQL `GROUP BY` over the filtered set and cached for
+5 minutes keyed by the filter tuple. That is fine at this size.
 
 ---
 
@@ -279,14 +412,9 @@ Because the proxy is undocumented:
 
 ---
 
-## 10. Milestones
+## 10. Delivery plan
 
-| # | Deliverable | Done when |
-|---|---|---|
-| M0 | Repo scaffold, `ProxyClient`, fixtures, probe | `satudatascape search "penduduk"` works; unit tests green |
-| M1 | Full crawl + SQLite store + checkpoint/resume | Full mirror completes, `count_stored` ≈ `count_list` |
-| M2 | Incremental + reconciliation + drift gates | Daily incremental takes < 2 min; deletions detected |
-| M3 | Resource downloader | `download --org badan-pangan-nasional --format CSV` mirrors files with hashes |
-| M4 | Export + stats | Parquet export and per-org/format stats |
+The implementation plan, sliced into small TDD increments with progress tracking,
+lives in **[PLAN.md](PLAN.md)**.
 
 Rough cost of a full metadata crawl at 2 req/s with 4 concurrent requests: ~614 pages × ~1.7 s each, which comes to **~5–10 min** and ~2 GB of transfer.
