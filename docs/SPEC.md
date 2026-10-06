@@ -1,0 +1,292 @@
+# satudatascape — Fetcher Spec
+
+Fetcher that mirrors the dataset catalogue (and, optionally, resource files) of
+**Satu Data Indonesia** (`data.go.id`), the national open data portal.
+
+Status: draft v0.1 · 2026-10-06 · all API facts below verified live on 2026-10-06.
+
+---
+
+## 1. Background: what the portal actually exposes
+
+The portal *is* CKAN-backed, but it is **not** a stock CKAN site anymore:
+
+| Assumption | Reality (verified) |
+|---|---|
+| `https://data.go.id/api/3/action/...` works | **404.** `data.go.id` is now a Next.js frontend. |
+| `katalog.data.go.id` CKAN host | **Does not resolve** (DNS NXDOMAIN). |
+| CKAN API reachable directly | Only through the frontend's proxy: `POST https://data.go.id/api/proxy`, which forwards to a Spring Boot backend that re-exposes a subset of CKAN `/api/3/action/*`. |
+
+### 1.1 The proxy
+
+```http
+POST https://data.go.id/api/proxy
+Content-Type: application/json
+
+{"endpoint": "/api/3/action/package_search?rows=1000&start=0&sort=id%20asc",
+ "method": "GET", "body": {}, "token": ""}
+```
+
+Response wraps the CKAN result in its own envelope:
+
+```json
+{"status": "200 OK", "message": "Sucess", "result": { ...CKAN result... }}
+```
+
+Unknown paths return a Spring-style error with HTTP 404:
+`{"timestamp": "...", "status": 404, "error": "Not Found", "path": "/api/3/action/group_list"}`.
+
+### 1.2 Supported actions
+
+| Action | Works | Notes |
+|---|---|---|
+| `package_search` | ✅ | Main workhorse. See quirks below. |
+| `package_show?id=` | ✅ | Full package dict incl. `resources`, `extras`, `organization`, `tags`. |
+| `package_list` | ✅ | Names only; `limit`/`offset` honored; full list (no limit) returns 616,056 names in one response. |
+| `status_show`, `organization_list`, `group_list` | ❌ 404 | Organizations must be derived from package dicts. |
+
+### 1.3 `package_search` behaviour (the parts that matter)
+
+| Param | Behaviour |
+|---|---|
+| `rows` | **Capped at 1000** (2000 → 1000 rows returned). ~3.4 MB / ~1.7 s per 1000-row page. |
+| `start` | Deep paging works (tested `start=200000`). |
+| `sort` | Honored. **Default is `prioritas_tahun desc` — not unique, unsafe for paging.** Use `sort=id asc` for full crawls. |
+| `q` | Honored, **including Solr field syntax**: `organization:<name>`, `res_format:CSV`, `metadata_modified:[NOW-7DAYS TO *]`. |
+| `fq` | ⚠️ **Silently ignored** (count unchanged). Put all filters in `q`. |
+| `facet.field`, `fl` | ⚠️ Ignored. `facets` always returns `{"": {".": 5}}`. |
+| `include_private` | No effect (good — public only). |
+| Top-level filter params (`organization=`) | Ignored. |
+
+### 1.4 Data shape and scale
+
+- `package_search` count: **613,739** datasets. `package_list`: **616,056** names.
+  The website shows **708,117**. The gap is unexplained (see §9 open questions);
+  the fetcher reports all three numbers and does not assume they match.
+- Records are **harvested** from ministry and regional CKAN/DCAT portals. `extras`
+  carries `harvest_source_id`, `harvest_source_title` (e.g. `"BSSN - CKAN"`),
+  `harvest_object_id`, `guid`, `dcat_issued`, `dcat_modified`,
+  `dcat_publisher_name`, `accesslevel` (e.g. `"Terbatas"`), `prioritas_tahun`, `language`.
+- `resources[].url` points at the **origin portal**, not data.go.id
+  (e.g. `satudata.jenepontokab.go.id/dataset-to-excel/<uuid>`,
+  `api-data.bssn.go.id/data-ckan/download/...`, `data.badanpangan.go.id/download/...`).
+  Downloading files means hitting hundreds of different government hosts of varying quality.
+- `resources[].format` is free text and dirty (`xlxs`, `xslx`, `xlxx` seen in facets). Normalise.
+- `datastore_active` is `false` on sampled resources, so there's no DataStore API to lean on.
+- `notes` may be truncated with `............` in search results; `package_show` returns the same text, so treat that as source data.
+
+### 1.5 Operational
+
+- No auth required. No rate-limit headers. 12 concurrent requests → all 200.
+- `robots.txt`: `Allow: /`, `Disallow: /private/`; sitemap at `/sitemap.xml`.
+- The proxy is an **undocumented internal endpoint**. It can change without notice;
+  the fetcher must detect drift loudly (§7).
+
+---
+
+## 2. Goals / non-goals
+
+**Goals**
+1. Full mirror of catalogue metadata (all package dicts) to local storage.
+2. Cheap incremental refresh (only changed packages).
+3. Optional, filtered download of resource files (by org, format, size).
+4. Be a polite client of a government service.
+
+**Non-goals (v1)**
+- Parsing or normalising the contents of resource files (CSV/XLSX → tables).
+- A UI or public API on top of the mirror.
+- Scraping the Next.js HTML; the proxy API is enough.
+
+---
+
+## 3. Architecture
+
+```
+          ┌──────────────┐   POST /api/proxy    ┌───────────────────────┐
+ CLI ───► │ ProxyClient  │ ───────────────────► │ data.go.id (Spring→CKAN) │
+          └──────┬───────┘                      └───────────────────────┘
+                 │ package dicts
+          ┌──────▼───────┐        ┌──────────────┐      GET resource.url
+          │ CatalogCrawler│──────►│  Store (SQLite│◄──── ResourceDownloader ───► origin hosts
+          │ full / incr   │       │  + raw JSONL) │       (per-host limits)
+          └──────────────┘        └──────────────┘
+```
+
+Language: **Python 3.12**, `httpx` (async), `tenacity` for retries, `sqlite3`,
+`typer` for the CLI, `pytest` + `respx` for tests. (Swap if you'd rather use Go/TS;
+nothing in the design depends on Python.)
+
+### 3.1 `ProxyClient`
+- `action(name: str, **params) -> dict`: builds `endpoint`, posts the envelope, unwraps `result`.
+- Raises `ProxyError` on non-200, on a body without `result`, or when the 404
+  Spring shape comes back. Raises `SchemaDrift` when `package_search.result`
+  lacks `count`/`results`.
+- Sends `User-Agent: satudatascape/<version> (+https://github.com/tomtomtomdev/satudatascape)`.
+- Global concurrency limit (default **4**) and a token bucket (default **2 req/s**).
+- Retries on 5xx, 429, timeouts: exponential backoff with jitter, max 5 tries. Honors `Retry-After` if one ever appears.
+- Timeouts: connect 10 s, read 90 s (1000-row pages are 3.4 MB).
+
+### 3.2 `CatalogCrawler`
+
+**Full crawl**
+1. `package_search?rows=0` → record `count_at_start`.
+2. Page with `sort=id asc`, `rows=1000`, `start=0,1000,…` (~614 pages).
+   Pages are independent, so run them through the client's concurrency limit.
+3. Upsert each package (§4). Checkpoint the last completed `start` so a crash resumes.
+4. Finish with a **reconciliation pass**: diff `package_list` (names) against stored names.
+   - Names in the list but not stored → `package_show` each one (catches items that shifted during paging).
+   - Names stored but no longer listed → mark `deleted_at` (soft delete).
+5. Record a run summary: counts from search / list / stored, pages, errors, duration.
+
+Why reconcile: offset paging over a live index can skip or duplicate rows when
+items are inserted mid-crawl. `id asc` keeps that window small; the
+`package_list` diff closes it.
+
+**Incremental crawl** (default mode after the first full run)
+1. `watermark` = max `metadata_modified` stored, minus a **1-hour overlap**.
+2. `q=metadata_modified:[<watermark>Z TO *]`, `sort=metadata_modified asc, id asc`, page through.
+3. Upsert. The upsert is idempotent, so the overlap is harmless.
+4. Run the `package_list` reconciliation **weekly** (not on every incremental run) to pick up deletions.
+
+Timestamps: CKAN returns naive ISO strings (`2026-06-17T08:23:12.600209`), which are UTC
+in CKAN. Store them as UTC and format Solr ranges as `YYYY-MM-DDTHH:MM:SSZ`.
+
+### 3.3 `ResourceDownloader` (opt-in)
+- Input: a selection query over the store (`--org`, `--format`, `--harvest-source`, `--since`).
+- Per-host concurrency **1** and ≥1 s spacing; global cap 8. Origin hosts are small regional servers.
+- Streams to `data/files/<package_id>/<resource_id>/<sanitised filename>`. Writes to `*.part`, then renames.
+- Records HTTP status, final URL, `Content-Type`, size, sha256, `ETag`/`Last-Modified`.
+- Re-downloads only when resource `metadata_modified` or `last_modified` changed, or with a conditional GET (`If-None-Match` / `If-Modified-Since`).
+- Size guard: skip > 500 MB by default (`--max-size`); `HEAD` first when the host supports it.
+- Dead links are expected. Record them, don't fail the run. Mark a host as down after N consecutive connection errors and skip it for the rest of the run.
+- TLS: some `.go.id` hosts have broken chains. Default is verify on. `--insecure-hosts` is an explicit allowlist, logged in the run record.
+
+---
+
+## 4. Storage
+
+`data/satudata.db` (SQLite, WAL mode):
+
+```sql
+packages(
+  id TEXT PRIMARY KEY, name TEXT UNIQUE, title TEXT,
+  org_id TEXT, org_name TEXT,
+  harvest_source_id TEXT, harvest_source_title TEXT,
+  metadata_created TEXT, metadata_modified TEXT,
+  num_resources INT, private INT, state TEXT,
+  raw_json TEXT NOT NULL,            -- full package dict, verbatim
+  content_hash TEXT NOT NULL,        -- sha256 of canonical raw_json
+  first_seen_at TEXT, last_seen_at TEXT, deleted_at TEXT
+);
+resources(
+  id TEXT PRIMARY KEY, package_id TEXT REFERENCES packages(id),
+  name TEXT, url TEXT, url_host TEXT,
+  format_raw TEXT, format_norm TEXT,  -- 'xlxs' → 'XLSX', etc.
+  metadata_modified TEXT, last_modified TEXT
+);
+organizations(id TEXT PRIMARY KEY, name TEXT, title TEXT, raw_json TEXT);  -- derived
+downloads(resource_id TEXT PRIMARY KEY, status INT, path TEXT, bytes INT,
+          sha256 TEXT, etag TEXT, last_modified TEXT, fetched_at TEXT, error TEXT);
+package_versions(package_id TEXT, content_hash TEXT, raw_json TEXT, seen_at TEXT,
+                 PRIMARY KEY(package_id, content_hash));   -- history, only when the hash changes
+runs(id INTEGER PRIMARY KEY, kind TEXT, started_at TEXT, finished_at TEXT,
+     count_search INT, count_list INT, count_stored INT, upserts INT,
+     changed INT, errors INT, checkpoint TEXT, notes TEXT);
+```
+
+The upsert compares `content_hash`. It only writes `package_versions` and bumps
+`changed` when the hash differs, and it always updates `last_seen_at`.
+
+Also writes `data/raw/YYYY-MM-DD/page-<start>.jsonl.gz` (one package per line)
+during full crawls, so a run can be replayed without hitting the API. Size is ~2 GB raw / ~200 MB gzipped per full crawl. Rotate these.
+
+Dataset files themselves stay out of git (`data/` in `.gitignore`).
+
+---
+
+## 5. CLI
+
+```
+satudatascape crawl --full                 # full mirror + reconcile
+satudatascape crawl                        # incremental (default)
+satudatascape reconcile                    # package_list diff only
+satudatascape show <id|name>               # live package_show, pretty-printed
+satudatascape search "<q>" [--rows N]      # passthrough, Solr syntax in q
+satudatascape download [--org X] [--format CSV,XLSX] [--harvest-source "BSSN - CKAN"]
+                       [--since 2026-01-01] [--max-size 500MB] [--dry-run]
+satudatascape export --format parquet|jsonl [--out PATH]
+satudatascape stats                        # counts by org / harvest source / format
+```
+
+Global flags: `--db`, `--concurrency`, `--rps`, `--log-format json|text`.
+
+---
+
+## 6. Configuration
+
+`satudatascape.toml` with env overrides (`SDS_*`):
+
+```toml
+base_url    = "https://data.go.id/api/proxy"
+concurrency = 4
+rps         = 2
+page_size   = 1000
+overlap     = "1h"
+user_agent  = "satudatascape/0.1 (+https://github.com/tomtomtomdev/satudatascape)"
+[download]
+per_host_concurrency = 1
+max_size = "500MB"
+insecure_hosts = []
+```
+
+---
+
+## 7. Robustness & drift detection
+
+Because the proxy is undocumented:
+
+- **Startup probe**: `package_search?rows=1`. Fail fast with a clear message if the envelope or `result.count` is missing.
+- **Sanity gates** on a full run: abort without soft-deleting anything if
+  `count_search` drops more than 10% against the previous run, or if a page returns 0 results before `start >= count`.
+- **Fallback documented, not built**: if the proxy goes away, the Next.js `/dataset`
+  page server-renders the same `package_search` payload in its RSC stream
+  (`self.__next_f.push`). That is the plan B; it is not in v1 scope.
+- Structured JSON logs; each run writes its `runs` row even on failure.
+
+---
+
+## 8. Testing
+
+- **Unit**: envelope unwrapping, error shapes, Solr range formatting, format normalisation, content hashing, upsert idempotence.
+- **Recorded fixtures** (`tests/fixtures/*.json`): real responses captured once —
+  `package_search` page, `package_show`, `package_list` slice, the 404 Spring body.
+  Run them through `respx`.
+- **Crawler simulation**: a fake index that inserts items mid-crawl, to prove that the reconciliation catches skipped rows.
+- **Live smoke test** (opt-in, `pytest -m live`): one `rows=1` search, one `package_show`. Never the full crawl in CI.
+
+---
+
+## 9. Open questions
+
+1. **Count mismatch**: UI shows 708,117, `package_search` returns 613,739, `package_list` returns 616,056.
+   Does the UI count include something the API hides, for example a second source or private and draft items?
+   We should ask the Satu Data secretariat (Bappenas) or compare facet totals.
+2. **Terms of use / attribution** for bulk mirroring and for republishing (the repo is public).
+   Datasets carry mostly empty `license_id`. Decide whether the repo ships only code, or also derived metadata.
+3. Is there a sanctioned public API key or endpoint (`api.data.go.id` answers **403**, which suggests something gated exists)?
+4. Should organization metadata be enriched from somewhere, given `organization_list` is unavailable?
+5. Scope of v1 downloads: everything, or a curated subset (e.g. `prioritas_tahun` datasets only)?
+
+---
+
+## 10. Milestones
+
+| # | Deliverable | Done when |
+|---|---|---|
+| M0 | Repo scaffold, `ProxyClient`, fixtures, probe | `satudatascape search "penduduk"` works; unit tests green |
+| M1 | Full crawl + SQLite store + checkpoint/resume | Full mirror completes, `count_stored` ≈ `count_list` |
+| M2 | Incremental + reconciliation + drift gates | Daily incremental takes < 2 min; deletions detected |
+| M3 | Resource downloader | `download --org badan-pangan-nasional --format CSV` mirrors files with hashes |
+| M4 | Export + stats | Parquet export and per-org/format stats |
+
+Rough cost of a full metadata crawl at 2 req/s with 4 concurrent requests: ~614 pages × ~1.7 s each, which comes to **~5–10 min** and ~2 GB of transfer.
