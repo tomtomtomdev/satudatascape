@@ -38,7 +38,7 @@ In scope: slices S0–S24 below (S25 is optional): proxy client, normalisers, SQ
 - **Agents:** one fresh sub-agent per slice; this orchestrating session dispatches, verifies and relays.
 
 ## Where
-Push target: remote `origin` → `https://github.com/tomtomtomdev/satudatascape.git`, branch `feat/satudatascape-v1` (`main` is the default branch, so slices go on a feature branch; resolved from the only remote). First push: `git push -u origin feat/satudatascape-v1`; then `git push origin feat/satudatascape-v1`. Never force-push, never push `main`.
+Push target: remote `origin` → `https://github.com/tomtomtomdev/satudatascape.git`, branch `feat/satudatascape-v1` (`main` is the default branch, so slices go on a feature branch; resolved from the only remote). First push: `git push -u origin feat/satudatascape-v1`; then `git push origin feat/satudatascape-v1`. Never force-push; slices never push `main`. **Close (owner request, 2026-10-09):** after the last slice, and once the full suite and build pass on the branch tip, the orchestrator merges `feat/satudatascape-v1` into `main` (no-ff) and pushes `origin main`.
 
 Repo layout (SPEC §3.0 tree is updated to match):
 ```
