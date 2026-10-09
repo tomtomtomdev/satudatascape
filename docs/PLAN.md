@@ -1,8 +1,88 @@
 # satudatascape — Implementation Plan
 
+Status: planning — next: review
+Goal: A local mirror of the Satu Data Indonesia catalogue (and best-effort data files) with a small internal web UI, built slice by slice, test-first.
+
 Companion to [SPEC.md](SPEC.md). The work is split into small vertical slices.
 Each slice is completed by **one sub-agent task**, test-first, and ends with a green
 build, a progress update in this file, a commit, and a push.
+
+---
+
+## Why
+data.go.id holds ~614k dataset records, but only through an undocumented proxy, with dirty
+metadata and files spread over ~400 regional hosts. Internal users (1–10) need a local copy
+they can search, filter and inspect, kept fresh automatically, and a usable table where the
+file allows one. Details: SPEC §1–2, FEASIBILITY.md.
+
+Success criteria (each must be covered by a slice's test):
+1. A full crawl stores every package `package_search` returns and survives a crash by resuming from its checkpoint.
+2. Reconciliation against `package_list` catches packages skipped during paging and soft-deletes removed ones.
+3. An incremental crawl fetches only packages modified since the watermark (minus a 1 h overlap), and the upsert is idempotent.
+4. Proxy drift (bad envelope, missing `count`/`results`, a >10% count drop, an empty page before the end) fails loudly and never soft-deletes.
+5. The client is polite: ≤4 concurrent requests, ≤2 req/s, retries with backoff, and an identifying User-Agent.
+6. Users can search (FTS5) and filter datasets, open a detail page with version history, see orgs, stats and runs, and trigger a run, all behind optional Basic auth.
+7. Crawls run on a schedule (daily incremental, weekly reconcile) without overlapping.
+8. Resource files download best-effort, with URL lint, magic-byte sniffing, an error taxonomy and per-host limits/backoff; the raw file is always kept.
+9. CSV/JSON/XLSX/XLS files are extracted to Parquet with an A/B/C quality grade, and that grade is visible and filterable in the UI.
+10. The catalogue exports to JSONL/Parquet, and the app ships as one Docker image with nightly backups.
+
+## What
+In scope: slices S0–S24 below (S25 is optional): proxy client, normalisers, SQLite store with FTS5, full/incremental/reconcile crawler, drift gates, CLI, FastAPI+HTMX UI, scheduler, Docker + backup, downloader, best-resource selection + host health, CSV/JSON/XLSX/XLS extraction, data in the UI, link-health page, export.
+
+**Out of scope** (SPEC §2 non-goals): harmonising indicators across regions; WMS/WFS data fetching (links only); OCR; a public API, multi-tenant accounts, horizontal scaling; scraping Next.js HTML (plan B is documented, not built); Litestream; charts on the Stats page; answering SPEC §9 open questions (not blocking v1); any deploy to a real host (S17 ships the image and docs only).
+
+## Who
+- **Users:** 1–10 internal users through the web UI; an operator using the CLI.
+- **Owner/reviewer:** Tommy (repo owner).
+- **Agents:** one fresh sub-agent per slice; this orchestrating session dispatches, verifies and relays.
+
+## Where
+Push target: remote `origin` → `https://github.com/tomtomtomdev/satudatascape.git`, branch `feat/satudatascape-v1` (`main` is the default branch, so slices go on a feature branch; resolved from the only remote).
+Repo layout (new, per SPEC §3.0): `pyproject.toml`, `uv.lock`, `.python-version`, `Makefile`, `.github/workflows/ci.yml`, `src/satudatascape/{client,normalize,store,crawler,runs,search,cli,config,downloader,select,extract/,export,backup,scheduler}.py`, `src/satudatascape/web/{app.py,templates/,static/}`, `src/satudatascape/migrations/*.sql`, `tests/` (+ `tests/fixtures/`), `scripts/capture_fixtures.py`, `Dockerfile`, `docker-compose.yml`, `docs/DEPLOY.md`.
+Runtime: local macOS (dev), GitHub Actions (CI, ubuntu), a Docker container on a small VM (deploy target, documented only). Runtime data lives in `data/` (gitignored).
+
+## When
+Strictly sequential by slice number, except slices marked ⇄. Milestones:
+- **M1 catalogue** — S0–S10: CLI mirror with search.
+- **M2 UI** — S11–S17: web UI, scheduler, Docker image.
+- **M3 files** — S18–S24: downloads, extraction, data in the UI, export.
+- **M4 optional** — S25.
+No deadline.
+
+## How
+
+### Tech stack
+New project: there's nothing to detect yet, so every row is proposed in SPEC §3.0 (written by the owner) and pinned in S0.
+
+| Layer | Choice | Version | Source |
+|-------|--------|---------|--------|
+| Language / toolchain | Python, uv | 3.12 / uv 0.11 | SPEC §3.0; `.python-version` (S0) |
+| HTTP | httpx (async) + tenacity | latest at S0, locked in `uv.lock` | SPEC §3.0 |
+| DB | SQLite (WAL) + FTS5, stdlib `sqlite3`, numbered SQL migrations | system SQLite ≥3.35 | SPEC §3.0 |
+| Web | FastAPI + Jinja2 + HTMX + Pico.css (CDN) | locked in `uv.lock` | SPEC §3.0 |
+| CLI / config | typer; TOML via stdlib `tomllib` + `SDS_*` env | locked | SPEC §3.0, §6 |
+| Scheduling | APScheduler (in-process) | 3.x | SPEC §3.0 |
+| Files / tables | openpyxl, xlrd, pyarrow; pdfplumber (S25 only) | locked | SPEC §3.4, FEASIBILITY |
+| Tests | pytest, pytest-asyncio, respx, FastAPI TestClient | locked | SPEC §3.0, §8 |
+| Lint / types | ruff (lint + format), mypy | locked | SPEC §3.0 |
+| Build / CI | Make, GitHub Actions, Docker | — | SPEC §3.0 |
+
+**New dependencies:** all of the above. They're approved by being in the owner's SPEC §3.0 and PLAN. Anything not listed here is a block to report, not a choice to make.
+
+### Approach
+See SPEC §3 (architecture, client, crawler, downloader, extractor), §4 (schema), §5/§5b (CLI, UI), §6 (config) and §7 (drift). Key decisions: one process and one SQLite file; hand-written SQL; FTS5 isolated behind a `search` module; offset paging on `id asc` plus a `package_list` reconcile; idempotent hash-based upsert; best-effort file extraction with a quality grade, always keeping the raw file.
+Risks and how each is retired:
+- Proxy drift → probe and gates (S8), offline fixtures plus an opt-in `pytest -m live`.
+- Paging skips → reconcile (S6).
+- Link rot → error taxonomy and host backoff (S18–S19).
+- Messy spreadsheets → quality grades (S21).
+- No local Docker daemon → see Commands.
+
+### Commands
+- **Test:** `make test` (= `uv run pytest`)
+- **Build / check:** `make check` (= `ruff check` + `ruff format --check` + `mypy` + `pytest`; from S17 on, also `docker build` when a daemon is available — CI always builds it)
+- **Run:** `uv run satudatascape <cmd>` (CLI, from S9); `uv run satudatascape serve` (UI, from S11)
 
 ---
 
