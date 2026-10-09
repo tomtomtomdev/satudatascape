@@ -110,8 +110,11 @@ async def test_non_200_envelope_raises_proxy_error_with_message() -> None:
 async def test_non_json_body_raises_proxy_error() -> None:
     respx.post(PROXY_URL).mock(return_value=httpx.Response(502, text="<html>Bad Gateway</html>"))
 
-    with pytest.raises(ProxyError) as info:
-        await ProxyClient().action("package_list")
+    async def no_sleep(_: float) -> None:
+        return None
+
+    with pytest.raises(ProxyError, match="unreadable body") as info:
+        await ProxyClient(sleep=no_sleep).action("package_list")  # 502 retries (S2)
 
     assert info.value.status == 502
 
