@@ -75,7 +75,7 @@ class Store:
                 continue
             record = (
                 "INSERT INTO schema_migrations VALUES "
-                f"('{version}', '{self._now()}');"  # trusted: package file name + clock
+                f"('{version}', '{self.now()}');"  # trusted: package file name + clock
             )
             try:
                 self.conn.executescript(f"BEGIN;\n{script.read_text('utf-8')}\n{record}\nCOMMIT;")
@@ -89,7 +89,7 @@ class Store:
     def upsert_packages(self, pkgs: Iterable[Package]) -> UpsertStats:
         """Insert or update packages in one transaction; only a new hash writes a version."""
         stats = UpsertStats()
-        now = self._now()
+        now = self.now()
         with self.conn:
             for pkg in pkgs:
                 self._upsert_one(pkg, now, stats)
@@ -202,7 +202,8 @@ class Store:
             (org["id"], org.get("name"), org.get("title"), canonical_json(org)),
         )
 
-    def _now(self) -> str:
+    def now(self) -> str:
+        """The store clock as a UTC ISO string."""
         return self._clock().astimezone(UTC).isoformat()
 
 
