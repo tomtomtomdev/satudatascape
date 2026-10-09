@@ -377,7 +377,7 @@ Done when: tests pass.
 |-------|--------|------|--------|-------|------------|
 | S0 Project scaffold & CI | done | 2026-10-09 | f4fceb3 (+ ci fixes 9c9c81d, ff5071e) | 1 passed (smoke); `make check` green, docker skipped | `0.1.0`; uv 0.11.26, Python 3.12.12, SQLite 3.51.3. Amended *Commands* (`docker-maybe` also requires a Dockerfile) |
 | S1 Proxy client: envelope & errors | done | 2026-10-09 | 9ce1b85 (CI 37893209335 green) | 16 new (`tests/test_client.py`) + 1 live; suite 17 passed, 1 deselected; `make check` green, docker skipped | `622223` (live `package_search rows=0`; plan said ~614k). Fixtures captured live, not hand-written |
-| S2 Proxy client: rate limit, retries, UA | done | 2026-10-09 | | 13 new (`tests/test_client_resilience.py`); suite 30 passed, 1 deselected in 0.27 s; `make check` green, docker skipped | Live at rps=1: 3 sequential `package_search rows=0` → `622223` at 0.18 / 1.34 / 2.15 s; unknown-id `package_show` → `ProxyError` 500 `404 NOT FOUND` once at 3.11 s, not retried. Amended S2 *Red* (500-wrapped 404 is non-retryable) |
+| S2 Proxy client: rate limit, retries, UA | done | 2026-10-09 | bcb3f10 (CI 37893510822 green) | 13 new (`tests/test_client_resilience.py`); suite 30 passed, 1 deselected in 0.27 s; `make check` green, docker skipped | Live at rps=1: 3 sequential `package_search rows=0` → `622223` at 0.18 / 1.34 / 2.15 s; unknown-id `package_show` → `ProxyError` 500 `404 NOT FOUND` once at 3.11 s, not retried. Amended S2 *Red* (500-wrapped 404 is non-retryable) |
 | S3 Normalisers | todo | | | | |
 | S4 Store: migrations + upsert | todo | | | | |
 | S5 Full crawl with checkpoint/resume | todo | | | | |
