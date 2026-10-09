@@ -1,6 +1,6 @@
 # satudatascape — Implementation Plan
 
-Status: S2 done — next: S3
+Status: S3 done — next: S4
 Goal: A local mirror of the Satu Data Indonesia catalogue (and best-effort data files) with a small internal web UI, built slice by slice, test-first.
 
 Companion to [SPEC.md](SPEC.md). The work is split into small vertical slices.
@@ -378,7 +378,7 @@ Done when: tests pass.
 | S0 Project scaffold & CI | done | 2026-10-09 | f4fceb3 (+ ci fixes 9c9c81d, ff5071e) | 1 passed (smoke); `make check` green, docker skipped | `0.1.0`; uv 0.11.26, Python 3.12.12, SQLite 3.51.3. Amended *Commands* (`docker-maybe` also requires a Dockerfile) |
 | S1 Proxy client: envelope & errors | done | 2026-10-09 | 9ce1b85 (CI 37893209335 green) | 16 new (`tests/test_client.py`) + 1 live; suite 17 passed, 1 deselected; `make check` green, docker skipped | `622223` (live `package_search rows=0`; plan said ~614k). Fixtures captured live, not hand-written |
 | S2 Proxy client: rate limit, retries, UA | done | 2026-10-09 | bcb3f10 (CI 37893510822 green) | 13 new (`tests/test_client_resilience.py`); suite 30 passed, 1 deselected in 0.27 s; `make check` green, docker skipped | Live at rps=1: 3 sequential `package_search rows=0` → `622223` at 0.18 / 1.34 / 2.15 s; unknown-id `package_show` → `ProxyError` 500 `404 NOT FOUND` once at 3.11 s, not retried. Amended S2 *Red* (500-wrapped 404 is non-retryable) |
-| S3 Normalisers | todo | | | | |
+| S3 Normalisers | done | 2026-10-09 | | 45 new (`tests/test_normalize.py`, table-driven); suite 75 passed, 1 deselected in 0.27 s; `make check` green, docker skipped | `['XLSX', 'CSV', 'PDF']`. No plan amendment |
 | S4 Store: migrations + upsert | todo | | | | |
 | S5 Full crawl with checkpoint/resume | todo | | | | |
 | S6 Reconciliation | todo | | | | |
@@ -416,6 +416,7 @@ Done when: tests pass.
 2026-10-09 S0 — CI: bumped to node24 action majors (checkout@v7, setup-uv@v10.2.0; setup-uv publishes no major tags, so it is pinned to the full tag). CI run 37892951137 green.
 2026-10-09 S1 — `ProxyClient.action` + `ProxyError(status, path)`; `SchemaDrift` subclasses `ProxyError`, so SPEC §3.1 ("ProxyError on a body without result") and S1 ("SchemaDrift") both hold. Params encoded with `urlencode(quote_via=quote)` (space → `%20`). Without an injected `httpx.AsyncClient` each call opens its own (S2 owns timeouts/UA/limits). Live findings: search count is now 622,223; `package_show` for an unknown id returns **HTTP 500** with envelope `{"status":"500 INTERNAL_SERVER_ERROR","message":"404 NOT FOUND: …"}` and no `result` — S2's retry-on-5xx would retry it 5 times, so S2/S6 should treat a `404 NOT FOUND` message as non-retryable. Fixture `package_search_rows2.json` is 28 KB (public metadata only).
 2026-10-09 S2 — `ratelimit.TokenBucket` (burst 1, one slot per 1/rps, injected clock/sleep); `ProxyClient(rps=2, concurrency=4, clock, sleep)`: semaphore held only around the HTTP call (bucket acquired inside it, never during backoff); tenacity `AsyncRetrying` 5 attempts, `wait_exponential_jitter(1, max 60)`, or `Retry-After` (seconds or HTTP date) when present. Retries 5xx/429/`httpx.TimeoutException`; never 4xx, `SchemaDrift`, or a 500 whose message holds `404 NOT FOUND` (S6 can rely on one request per missing id). UA and `Timeout(90, connect=10)` set per request, so they also apply to an injected `AsyncClient`. S1's 502 test now injects a no-op sleep (it retried with real backoff, ~17 s). Connection errors (non-timeout) are not retried, per SPEC §3.1.
+2026-10-09 S3 — `normalize.py`: `format_norm` (strip, first part of `a/b`, drop leading dot, upper-case, aliases `xlxs`/`xslx`/`xlxx` → XLSX, `google spreadsheet` → GSHEET; `None`/blank → `""` — the `package_show` fixture's sumatera-barat package has 2 resources with format `""`, so S4/S19 must expect an empty `format_norm`); `prioritas_years` keeps 4-digit years in 2000–2099 (drops the `1970` epoch placeholder), sorted and de-duplicated; `org_type` from the first `-` token of the org name (`kotabaru-…` → other, `kabupaten-kotawaringin-…` → kabupaten); `parse_ckan_ts` → aware UTC (naive = UTC, offsets converted, `None`/`""` → `None`); `solr_ts` drops microseconds and treats naive input as UTC.
 
 ---
 
