@@ -1,4 +1,4 @@
-"""Catalogue crawler (SPEC §3.2): resumable full crawl and the `package_list` reconcile."""
+"""Catalogue crawler (SPEC §3.2): resumable full crawl, `package_list` reconcile, incremental."""
 
 import asyncio
 import gzip
@@ -7,16 +7,20 @@ import re
 import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from satudatascape.client import ProxyClient, ProxyError, SchemaDrift
+from satudatascape.normalize import parse_ckan_ts, solr_ts
 from satudatascape.store import Package, Store, UpsertStats, canonical_json
 
 PAGE_SIZE = 1000  # the proxy caps `rows` at 1000 (SPEC §1.3)
 WORKERS = 4  # pages in flight; the client's own limits still apply
 RAW_KEEP = 3  # raw run directories kept by rotation
 LIST_BATCH = 50_000  # package_list names inserted per executemany
+OVERLAP = timedelta(hours=1)  # incremental re-fetch window below the watermark
+INCREMENTAL_SORT = "metadata_modified asc, id asc"
 _DAY_DIR = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -206,6 +210,94 @@ async def _fetch_missing(
     await asyncio.gather(*(worker() for _ in range(workers)))
     result.fetched = len(found)
     return store.upsert_packages(found)
+
+
+class NeedsFullCrawl(Exception):
+    """The store has no packages, so there is no watermark to crawl from."""
+
+
+@dataclass
+class IncrementalResult:
+    run_id: int
+    watermark: datetime
+    q: str
+    count_search: int = 0
+    pages: int = 0
+    upserts: int = 0
+    inserted: int = 0
+    changed: int = 0
+    unchanged: int = 0
+    count_stored: int = 0
+
+
+def watermark(store: Store) -> datetime | None:
+    """The newest stored `metadata_modified` (UTC), or None for an empty store."""
+    row = store.conn.execute("SELECT max(metadata_modified) FROM packages").fetchone()
+    return parse_ckan_ts(row[0])
+
+
+def incremental_q(mark: datetime, overlap: timedelta = OVERLAP) -> str:
+    """Solr range from the watermark minus the overlap (SPEC §3.2)."""
+    return f"metadata_modified:[{solr_ts(mark - overlap)} TO *]"
+
+
+async def incremental(
+    client: ProxyClient,
+    store: Store,
+    run_id: int | None = None,
+    *,
+    page_size: int = PAGE_SIZE,
+    overlap: timedelta = OVERLAP,
+) -> IncrementalResult:
+    """Fetch only packages modified since the watermark minus `overlap`, and upsert them.
+
+    Pages are fetched in order on `metadata_modified asc, id asc`; the upsert is idempotent,
+    so the overlap re-fetch shows up as `unchanged`, never as `changed`. An empty store has
+    no watermark and raises `NeedsFullCrawl` before any request. Deletions are left to the
+    weekly reconcile; finishing the run is left to the caller (S8 `run_incremental`).
+    """
+    mark = watermark(store)
+    if mark is None:
+        raise NeedsFullCrawl("no stored packages: run a full crawl first")
+    if run_id is None:
+        run_id = _start_run(store, "incremental")
+    result = IncrementalResult(run_id, mark, incremental_q(mark, overlap))
+    start, count = 0, None
+    while count is None or start < count:
+        page = await client.action(
+            "package_search", q=result.q, sort=INCREMENTAL_SORT, rows=page_size, start=start
+        )
+        count = int(page["count"])
+        packages: list[Package] = page["results"]
+        if not packages:
+            if start < count:
+                raise SchemaDrift(
+                    f"package_search: empty page at start={start} before count={count}",
+                    status=200,
+                )
+            break
+        stats = store.upsert_packages(packages)
+        result.pages += 1
+        result.upserts += len(packages)
+        result.inserted += stats.inserted
+        result.changed += stats.changed
+        result.unchanged += stats.unchanged
+        start += page_size
+    result.count_search = count
+    result.count_stored = _count_stored(store)
+    with store.conn:
+        store.conn.execute(
+            "UPDATE runs SET count_search = ?, count_stored = ?, upserts = upserts + ?,"
+            " changed = changed + ? WHERE id = ?",
+            (
+                result.count_search,
+                result.count_stored,
+                result.upserts,
+                result.inserted + result.changed,
+                run_id,
+            ),
+        )
+    return result
 
 
 class _Frontier:
