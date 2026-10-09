@@ -1,0 +1,659 @@
+{
+  "status": "200 OK",
+  "message": "Sucess",
+  "result": {
+    "count": 622223,
+    "facets": {
+      "": {
+        ".": 5
+      }
+    },
+    "results": [
+      {
+        "author": "TOMMY PANGLIMA",
+        "author_email": "panglimatomm22@gmail.com",
+        "creator_user_id": "e6a34141-04ea-41ce-b5da-11c4c1fde4a0",
+        "id": "00003d3a-754f-41f7-91f7-e2ef772354c7",
+        "isopen": false,
+        "license_id": "",
+        "license_title": "",
+        "maintainer": "",
+        "maintainer_email": "",
+        "metadata_created": "2026-07-09T12:44:39.449888",
+        "metadata_modified": "2026-07-09T12:44:39.449898",
+        "name": "angka-kematian-ibu-aki14",
+        "notes": "Angka kematian ibu (AKI)",
+        "num_resources": 1,
+        "num_tags": 0,
+        "organization": {
+          "id": "0b01bc67-ec83-476d-9446-9c391d608250",
+          "name": "kabupaten-kampar",
+          "title": "Kabupaten Kampar",
+          "type": "organization",
+          "description": "",
+          "image_url": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Lambang_Kabupaten_Kampar.png",
+          "created": "2022-10-16T15:35:00.386818",
+          "is_organization": true,
+          "approval_status": "approved",
+          "state": "active"
+        },
+        "owner_org": "0b01bc67-ec83-476d-9446-9c391d608250",
+        "private": false,
+        "state": "active",
+        "title": "Angka kematian ibu (AKI) tahun 2025",
+        "type": "dataset",
+        "url": "https://dinkes.kamparkab.go.id/",
+        "version": "",
+        "extras": [
+          {
+            "key": "Angka kematian ibu (AKI) tahun 2025",
+            "value": "IBU"
+          },
+          {
+            "key": "harvest_object_id",
+            "value": "5a8839ee-fb73-46a0-a7a5-4dc6ae07bfe2"
+          },
+          {
+            "key": "harvest_source_id",
+            "value": "6e4a329a-b8dc-41f0-a312-eef419d38559"
+          },
+          {
+            "key": "harvest_source_title",
+            "value": "Kabupaten Kampar - CKAN"
+          }
+        ],
+        "resources": [
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-06-22T07:49:28.354380",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "Angka kematian ibu (AKI)",
+            "format": "XLSX",
+            "hash": "",
+            "id": "dca96dfb-9c3b-49c2-930e-dbb2486100e7",
+            "last_modified": "2026-06-23T10:43:30.436326",
+            "metadata_modified": "2026-07-09T12:44:39.448431",
+            "mimetype": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "mimetype_inner": null,
+            "name": "JUMLAH KEMATIAN IBU MENURUT KECAMATAN.xlsx",
+            "package_id": "00003d3a-754f-41f7-91f7-e2ef772354c7",
+            "position": 0,
+            "resource_type": null,
+            "size": 80508,
+            "state": "active",
+            "url": "https://data.kamparkab.go.id/dataset/00003d3a-754f-41f7-91f7-e2ef772354c7/resource/dca96dfb-9c3b-49c2-930e-dbb2486100e7/download/jumlah-kematian-ibu-menurut-kecamatan.xlsx",
+            "url_type": null
+          }
+        ],
+        "tags": [],
+        "groups": [],
+        "relationships_as_subject": [],
+        "relationships_as_object": []
+      },
+      {
+        "creator_user_id": "f28ed00f-17c6-4ad1-9e24-778f6af7123d",
+        "id": "0000aa74-bced-4e2d-a984-f816b1059523",
+        "isopen": false,
+        "license_title": null,
+        "metadata_created": "2026-07-08T02:30:30.565714",
+        "metadata_modified": "2026-07-08T02:30:30.565724",
+        "name": "skpg-sumatera-barat-april-2023",
+        "notes": "Dataset ini memuat informasi Sistem Peringatan Dini Kerawanan Pangan dan Gizi (SKPG) Provinsi Sumatera Barat bulan April tahun 2023. Sesuai dengan ketentuan dalam Peraturan Badan Pangan Nasional No 16 Tahun 2022 tentang Penyelenggaraan Sistem Peringatan Dini Kerawanan Pangan dan Gizi (SKPG), bahwa penyelenggaraan SKPG menjadi tanggung jawab pemerintah Pusat, Pemerintah Provinsi dan Pemerintah Kabupaten/kota. SKPG Provinsi Sumatera Barat  digambarkan dalam peta rencana dengan tingkat ketelitian 1:3.000.000.",
+        "num_resources": 15,
+        "num_tags": 4,
+        "organization": {
+          "id": "cc3e6dfa-579b-4b82-b51a-7b209bf95b05",
+          "name": "provinsi-sumatera-barat",
+          "title": "Provinsi Sumatera Barat",
+          "type": "organization",
+          "description": "",
+          "image_url": "https://1.bp.blogspot.com/-VUSM2sQrct8/VFnXKnodclI/AAAAAAAAEow/kQDb0Lnxfhk/s1600/Logo-Pemerintah-Propinsi-Sumatera-Barat.png",
+          "created": "2022-10-08T06:31:47.234390",
+          "is_organization": true,
+          "approval_status": "approved",
+          "state": "active"
+        },
+        "owner_org": "cc3e6dfa-579b-4b82-b51a-7b209bf95b05",
+        "private": false,
+        "state": "active",
+        "title": "SKPG SUMATERA BARAT APRIL 2023",
+        "type": "dataset",
+        "extras": [
+          {
+            "key": "access_constraints",
+            "value": "[\"Not Specified: The original author did not specify a license.\"]"
+          },
+          {
+            "key": "bbox-east-long",
+            "value": "101.89291749684521"
+          },
+          {
+            "key": "bbox-north-lat",
+            "value": "0.907389178068289"
+          },
+          {
+            "key": "bbox-south-lat",
+            "value": "-3.350002298167361"
+          },
+          {
+            "key": "bbox-west-long",
+            "value": "98.59667980373007"
+          },
+          {
+            "key": "contact-email",
+            "value": "dispangan.sumbar@gmail.com"
+          },
+          {
+            "key": "coupled-resource",
+            "value": "[]"
+          },
+          {
+            "key": "dataset-reference-date",
+            "value": "[{\"type\": \"publication\", \"value\": \"2025-10-10T09:13:00Z\"}]"
+          },
+          {
+            "key": "frequency-of-update",
+            "value": "monthly"
+          },
+          {
+            "key": "graphic-preview-description",
+            "value": "Thumbnail for 'SKPG SUMATERA BARAT APRIL 2023'"
+          },
+          {
+            "key": "graphic-preview-file",
+            "value": "https://geoportal.sumbarprov.go.id/uploaded/thumbs/dataset-0a347356-b37e-4a50-b298-8d73c4de69dd-thumb-398b0a31-21dc-404e-a21e-25cbce1535e1.jpg"
+          },
+          {
+            "key": "graphic-preview-type",
+            "value": "image/png"
+          },
+          {
+            "key": "guid",
+            "value": "0a347356-b37e-4a50-b298-8d73c4de69dd"
+          },
+          {
+            "key": "licence",
+            "value": "[]"
+          },
+          {
+            "key": "lineage",
+            "value": "Sistem informasi yang saling berkaitan untuk mendukung pencapaian penurunan kerawanan Pangan dan Gizi yang dilaksanakan oleh Badan Pangan Nasional yaitu Peta Ketahanan dan Kerentanan Pangan (Food Security and Vulnerability Atlas – FSVA) dan SKPG. SKPG diperlukan untuk mengantisipasi terjadinya kerawanan Pangan dan Gizi yang dilaksanakan secara berjenjang dan dilakukan secara periodik (bulanan) dan dapat digunakan sebagai perangkat untukmemprediksi potensi kerawanan Pangan dan Gizi serta memberikan rekomendasi tindakan pencegahan dan/atau penanggulangan yang diperlukan melalui pengumpulan, pemrosesan, penyimpanan, analisis, dan penyebaran informasi situasi Pangan dan Gizi. "
+          },
+          {
+            "key": "metadata-date",
+            "value": "2025-10-15T00:58:21Z"
+          },
+          {
+            "key": "metadata-language",
+            "value": "ind"
+          },
+          {
+            "key": "progress",
+            "value": "completed"
+          },
+          {
+            "key": "resource-type",
+            "value": "dataset"
+          },
+          {
+            "key": "responsible-party",
+            "value": "[{\"name\": \"Dinas Pangan Provinsi Sumatera Barat\", \"roles\": [\"owner\"]}]"
+          },
+          {
+            "key": "spatial",
+            "value": "{\"type\": \"Polygon\", \"coordinates\": [[[98.59667980373007, -3.350002298167361], [101.89291749684521, -3.350002298167361], [101.89291749684521, 0.907389178068289], [98.59667980373007, 0.907389178068289], [98.59667980373007, -3.350002298167361]]]}"
+          },
+          {
+            "key": "spatial-data-service-type",
+            "value": ""
+          },
+          {
+            "key": "spatial-reference-system",
+            "value": "4326"
+          },
+          {
+            "key": "spatial_harvester",
+            "value": "true"
+          },
+          {
+            "key": "harvest_object_id",
+            "value": "a7ec1b62-3d1e-4a3a-b54c-efd32c0c8f75"
+          },
+          {
+            "key": "harvest_source_id",
+            "value": "ac143e56-e831-4b10-b3be-3702cd3e44e7"
+          },
+          {
+            "key": "harvest_source_title",
+            "value": "Provinsi Sumatera Barat - CSW"
+          }
+        ],
+        "resources": [
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567769",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "Online link to the 'SKPG SUMATERA BARAT APRIL 2023' description on GeoNode",
+            "format": "",
+            "hash": "",
+            "id": "f899cb2f-d5eb-48e4-8f81-7cfda7286468",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.557300",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "Unnamed resource",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 0,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:LINK-1.0-http--link",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/catalogue/#/dataset/1119",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567779",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (skpg_sumbar_april_2023_ar Format)",
+            "format": "",
+            "hash": "",
+            "id": "20650b07-2600-44a8-8eae-c37bdb6f5df7",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.557430",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.shx",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 1,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/api/v2/assets/574/link",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567785",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (JPEG Format)",
+            "format": "WMS",
+            "hash": "",
+            "id": "fd5e011f-a9fc-4c2b-a54e-0fa32ab11459",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.557541",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.jpg",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 2,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WMS&request=GetMap&layers=geonode%3Askpg_sumbar_april_2023_ar&format=image%2Fjpeg&height=550&width=550&srs=EPSG%3A4326&bbox=98.5966798%2C-3.3500023%2C101.8929175%2C0.9073892",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567791",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (Zipped Shapefile Format)",
+            "format": "WFS",
+            "hash": "",
+            "id": "f764aa60-e8d2-42c6-b7eb-2b2ad5f1e60a",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.557646",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.zip",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 3,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature&typename=geonode%3Askpg_sumbar_april_2023_ar&outputFormat=SHAPE-ZIP&srs=EPSG%3A4326&format_options=charset%3AUTF-8",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567796",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (GML 2.0 Format)",
+            "format": "WFS",
+            "hash": "",
+            "id": "452a0ebf-5b66-4e81-aeb7-06e11e0bb75d",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.557747",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.gml",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 4,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature&typename=geonode%3Askpg_sumbar_april_2023_ar&outputFormat=gml2&srs=EPSG%3A4326",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567802",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (CSV Format)",
+            "format": "WFS",
+            "hash": "",
+            "id": "50075b5b-eb96-4259-9b89-464d18abe9f4",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.557846",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.csv",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 5,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature&typename=geonode%3Askpg_sumbar_april_2023_ar&outputFormat=csv&srs=EPSG%3A4326",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567807",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (Legend Format)",
+            "format": "WMS",
+            "hash": "",
+            "id": "bc831fd1-eab5-4f23-b177-09beeab2dcaf",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.557944",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.png",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 6,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WMS&request=GetLegendGraphic&format=image/png&WIDTH=20&HEIGHT=20&LAYER=geonode:skpg_sumbar_april_2023_ar&STYLE=skpg_sumbar_april_2023_ar&version=1.3.0&sld_version=1.1.0&legend_options=fontAntiAliasing:true;fontSize:12;forceLabels:on",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567813",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (GML 3.1.1 Format)",
+            "format": "WFS",
+            "hash": "",
+            "id": "d2eae0e3-b4db-43cf-a1c9-ea4928d5f82d",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558040",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.gml",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 7,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature&typename=geonode%3Askpg_sumbar_april_2023_ar&outputFormat=text%2Fxml%3B+subtype%3Dgml%2F3.1.1&srs=EPSG%3A4326",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567818",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (Excel Format)",
+            "format": "WFS",
+            "hash": "",
+            "id": "02a65a0b-1eca-4228-8977-523381b2e409",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558137",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.excel",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 8,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature&typename=geonode%3Askpg_sumbar_april_2023_ar&outputFormat=excel&srs=EPSG%3A4326",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567823",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (PNG Format)",
+            "format": "WMS",
+            "hash": "",
+            "id": "cb72fa6e-b9b8-44ac-9d6d-c06098ba8cb7",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558235",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.png",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 9,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WMS&request=GetMap&layers=geonode%3Askpg_sumbar_april_2023_ar&format=image%2Fpng&height=550&width=550&srs=EPSG%3A4326&bbox=98.5966798%2C-3.3500023%2C101.8929175%2C0.9073892",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567829",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (PDF Format)",
+            "format": "WMS",
+            "hash": "",
+            "id": "3874360f-5068-421f-867b-e2adea5e29ee",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558330",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.pdf",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 10,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WMS&request=GetMap&layers=geonode%3Askpg_sumbar_april_2023_ar&format=application%2Fpdf&height=550&width=550&srs=EPSG%3A4326&bbox=98.5966798%2C-3.3500023%2C101.8929175%2C0.9073892",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567834",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (Thumbnail Format)",
+            "format": "JPEG",
+            "hash": "",
+            "id": "6d4f6976-f205-48de-9863-88dabc80bbfc",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558424",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.png",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 11,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/uploaded/thumbs/dataset-0a347356-b37e-4a50-b298-8d73c4de69dd-thumb-398b0a31-21dc-404e-a21e-25cbce1535e1.jpg",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567839",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "SKPG SUMATERA BARAT APRIL 2023 (GeoJSON Format)",
+            "format": "WFS",
+            "hash": "",
+            "id": "aa4829d3-a0c6-41dc-80ea-311230ff23fb",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558518",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "skpg_sumbar_april_2023_ar.json",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 12,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "WWW:DOWNLOAD-1.0-http--download",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows?service=WFS&version=1.0.0&request=GetFeature&typename=geonode%3Askpg_sumbar_april_2023_ar&outputFormat=json&srs=EPSG%3A4326&srsName=EPSG%3A4326",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567845",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "geonode Service - Provides Layer: SKPG SUMATERA BARAT APRIL 2023",
+            "format": "WMS",
+            "hash": "",
+            "id": "ffeb6f24-916e-4cca-856d-105e0da4eb81",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558612",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "geonode:skpg_sumbar_april_2023_ar",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 13,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "OGC:WMS",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows",
+            "url_type": null
+          },
+          {
+            "cache_last_updated": null,
+            "cache_url": null,
+            "created": "2026-07-08T02:30:30.567850",
+            "datastore_active": false,
+            "datastore_contains_all_records_of_source_file": false,
+            "description": "geonode Service - Provides Layer: SKPG SUMATERA BARAT APRIL 2023",
+            "format": "WFS",
+            "hash": "",
+            "id": "9296653a-e0d3-4c55-88bb-5a809549bce8",
+            "last_modified": null,
+            "metadata_modified": "2026-07-08T02:30:30.558704",
+            "mimetype": null,
+            "mimetype_inner": null,
+            "name": "geonode:skpg_sumbar_april_2023_ar",
+            "package_id": "0000aa74-bced-4e2d-a984-f816b1059523",
+            "position": 14,
+            "resource_locator_function": "",
+            "resource_locator_protocol": "OGC:WFS",
+            "resource_type": null,
+            "size": null,
+            "state": "active",
+            "url": "https://geoportal.sumbarprov.go.id/geoserver/ows",
+            "url_type": null
+          }
+        ],
+        "tags": [
+          {
+            "display_name": "gizi",
+            "id": "5b8ef9ee-8756-46fe-a9ba-4ede432b20f1",
+            "name": "gizi",
+            "state": "active",
+            "vocabulary_id": null
+          },
+          {
+            "display_name": "indonesia",
+            "id": "ae67be4c-a580-42ae-a01b-73469e6b167f",
+            "name": "indonesia",
+            "state": "active",
+            "vocabulary_id": null
+          },
+          {
+            "display_name": "kerawanan-pangan",
+            "id": "bbad2cc4-bb4f-49b0-955b-ea1691d80044",
+            "name": "kerawanan-pangan",
+            "state": "active",
+            "vocabulary_id": null
+          },
+          {
+            "display_name": "skpg",
+            "id": "963f0b06-17cb-4d02-9c63-f1d670882745",
+            "name": "skpg",
+            "state": "active",
+            "vocabulary_id": null
+          }
+        ],
+        "groups": [],
+        "relationships_as_subject": [],
+        "relationships_as_object": []
+      }
+    ],
+    "sort": "id asc",
+    "search_facets": {
+      "": {
+        "title": "",
+        "items": [
+          {
+            "name": ".",
+            "display_name": ".",
+            "count": 5
+          }
+        ]
+      }
+    }
+  }
+}

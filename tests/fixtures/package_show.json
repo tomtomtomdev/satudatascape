@@ -1,0 +1,87 @@
+{
+  "status": "200 OK",
+  "message": "Sucess",
+  "result": {
+    "author": "TOMMY PANGLIMA",
+    "author_email": "panglimatomm22@gmail.com",
+    "creator_user_id": "e6a34141-04ea-41ce-b5da-11c4c1fde4a0",
+    "id": "00003d3a-754f-41f7-91f7-e2ef772354c7",
+    "isopen": false,
+    "license_id": "",
+    "license_title": "",
+    "maintainer": "",
+    "maintainer_email": "",
+    "metadata_created": "2026-07-09T12:44:39.449888",
+    "metadata_modified": "2026-07-09T12:44:39.449898",
+    "name": "angka-kematian-ibu-aki14",
+    "notes": "Angka kematian ibu (AKI)",
+    "num_resources": 1,
+    "num_tags": 0,
+    "organization": {
+      "id": "0b01bc67-ec83-476d-9446-9c391d608250",
+      "name": "kabupaten-kampar",
+      "title": "Kabupaten Kampar",
+      "type": "organization",
+      "description": "",
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/f/f0/Lambang_Kabupaten_Kampar.png",
+      "created": "2022-10-16T15:35:00.386818",
+      "is_organization": true,
+      "approval_status": "approved",
+      "state": "active"
+    },
+    "owner_org": "0b01bc67-ec83-476d-9446-9c391d608250",
+    "private": false,
+    "state": "active",
+    "title": "Angka kematian ibu (AKI) tahun 2025",
+    "type": "dataset",
+    "url": "https://dinkes.kamparkab.go.id/",
+    "version": "",
+    "extras": [
+      {
+        "key": "Angka kematian ibu (AKI) tahun 2025",
+        "value": "IBU"
+      },
+      {
+        "key": "harvest_object_id",
+        "value": "5a8839ee-fb73-46a0-a7a5-4dc6ae07bfe2"
+      },
+      {
+        "key": "harvest_source_id",
+        "value": "6e4a329a-b8dc-41f0-a312-eef419d38559"
+      },
+      {
+        "key": "harvest_source_title",
+        "value": "Kabupaten Kampar - CKAN"
+      }
+    ],
+    "resources": [
+      {
+        "cache_last_updated": null,
+        "cache_url": null,
+        "created": "2026-06-22T07:49:28.354380",
+        "datastore_active": false,
+        "datastore_contains_all_records_of_source_file": false,
+        "description": "Angka kematian ibu (AKI)",
+        "format": "XLSX",
+        "hash": "",
+        "id": "dca96dfb-9c3b-49c2-930e-dbb2486100e7",
+        "last_modified": "2026-06-23T10:43:30.436326",
+        "metadata_modified": "2026-07-09T12:44:39.448431",
+        "mimetype": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "mimetype_inner": null,
+        "name": "JUMLAH KEMATIAN IBU MENURUT KECAMATAN.xlsx",
+        "package_id": "00003d3a-754f-41f7-91f7-e2ef772354c7",
+        "position": 0,
+        "resource_type": null,
+        "size": 80508,
+        "state": "active",
+        "url": "https://data.kamparkab.go.id/dataset/00003d3a-754f-41f7-91f7-e2ef772354c7/resource/dca96dfb-9c3b-49c2-930e-dbb2486100e7/download/jumlah-kematian-ibu-menurut-kecamatan.xlsx",
+        "url_type": null
+      }
+    ],
+    "tags": [],
+    "groups": [],
+    "relationships_as_subject": [],
+    "relationships_as_object": []
+  }
+}

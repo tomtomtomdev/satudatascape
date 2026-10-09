@@ -1,6 +1,6 @@
 # satudatascape — Implementation Plan
 
-Status: S0 done — next: S1
+Status: S1 done — next: S2
 Goal: A local mirror of the Satu Data Indonesia catalogue (and best-effort data files) with a small internal web UI, built slice by slice, test-first.
 
 Companion to [SPEC.md](SPEC.md). The work is split into small vertical slices.
@@ -376,7 +376,7 @@ Done when: tests pass.
 | Slice | Status | Date | Commit | Tests | Run showed |
 |-------|--------|------|--------|-------|------------|
 | S0 Project scaffold & CI | done | 2026-10-09 | f4fceb3 (+ ci fixes 9c9c81d, ff5071e) | 1 passed (smoke); `make check` green, docker skipped | `0.1.0`; uv 0.11.26, Python 3.12.12, SQLite 3.51.3. Amended *Commands* (`docker-maybe` also requires a Dockerfile) |
-| S1 Proxy client: envelope & errors | todo | | | | |
+| S1 Proxy client: envelope & errors | done | 2026-10-09 | | 16 new (`tests/test_client.py`) + 1 live; suite 17 passed, 1 deselected; `make check` green, docker skipped | `622223` (live `package_search rows=0`; plan said ~614k). Fixtures captured live, not hand-written |
 | S2 Proxy client: rate limit, retries, UA | todo | | | | |
 | S3 Normalisers | todo | | | | |
 | S4 Store: migrations + upsert | todo | | | | |
@@ -414,6 +414,7 @@ Done when: tests pass.
 <!-- Each slice appends one line: `YYYY-MM-DD Sn — note` -->
 2026-10-09 S0 — uv package scaffold, all stack deps except pdfplumber locked (fastapi 0.143, httpx 0.28, pyarrow 25, apscheduler 3.x, mypy 2.4, ruff 0.16); `[project.scripts]` left for S9b; `docker-maybe` guard now also checks for a Dockerfile so CI stays green before S17; ruff excludes `scripts/feasibility/`.
 2026-10-09 S0 — CI: bumped to node24 action majors (checkout@v7, setup-uv@v10.2.0; setup-uv publishes no major tags, so it is pinned to the full tag). CI run 37892951137 green.
+2026-10-09 S1 — `ProxyClient.action` + `ProxyError(status, path)`; `SchemaDrift` subclasses `ProxyError`, so SPEC §3.1 ("ProxyError on a body without result") and S1 ("SchemaDrift") both hold. Params encoded with `urlencode(quote_via=quote)` (space → `%20`). Without an injected `httpx.AsyncClient` each call opens its own (S2 owns timeouts/UA/limits). Live findings: search count is now 622,223; `package_show` for an unknown id returns **HTTP 500** with envelope `{"status":"500 INTERNAL_SERVER_ERROR","message":"404 NOT FOUND: …"}` and no `result` — S2's retry-on-5xx would retry it 5 times, so S2/S6 should treat a `404 NOT FOUND` message as non-retryable. Fixture `package_search_rows2.json` is 28 KB (public metadata only).
 
 ---
 
