@@ -1,11 +1,11 @@
-"""Catalogue crawler (SPEC §3.2): resumable full crawl, `package_list` reconcile, incremental."""
+"""Catalogue crawler (SPEC §3.2, §7): full crawl, reconcile, incremental, and `run_*` wrappers."""
 
 import asyncio
 import gzip
 import json
 import re
 import shutil
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -13,6 +13,7 @@ from typing import Any
 
 from satudatascape.client import ProxyClient, ProxyError, SchemaDrift
 from satudatascape.normalize import parse_ckan_ts, solr_ts
+from satudatascape.runs import RunLock, finish_run, reopen_run, start_run
 from satudatascape.store import Package, Store, UpsertStats, canonical_json
 
 PAGE_SIZE = 1000  # the proxy caps `rows` at 1000 (SPEC §1.3)
@@ -21,6 +22,7 @@ RAW_KEEP = 3  # raw run directories kept by rotation
 LIST_BATCH = 50_000  # package_list names inserted per executemany
 OVERLAP = timedelta(hours=1)  # incremental re-fetch window below the watermark
 INCREMENTAL_SORT = "metadata_modified asc, id asc"
+MAX_DROP = 0.10  # drift gate: a count more than 10% below its baseline aborts (SPEC §7)
 _DAY_DIR = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -128,14 +130,17 @@ async def reconcile(
     *,
     workers: int = WORKERS,
     batch: int = LIST_BATCH,
+    max_drop: float = MAX_DROP,
 ) -> ReconcileResult:
     """Diff `package_list` names against the store (SPEC §3.2 step 4).
 
     The names land in a temp table in batches and the diff runs in SQL. Listed names that are
     not stored (or are soft-deleted) are fetched with `package_show` and upserted; a
     `404 NOT FOUND` is skipped and counted. Only then are stored names that are no longer
-    listed soft-deleted, so a rename is an update, not a delete. Without `run_id` a
-    `runs(kind='reconcile')` row is created; finishing it is left to the caller (S8).
+    listed soft-deleted, so a rename is an update, not a delete. A list more than `max_drop`
+    below the live stored count raises `CountDrop` before anything is fetched or deleted.
+    Without `run_id` a `runs(kind='reconcile')` row is created; finishing it is left to the
+    caller (`run_reconcile` / `run_full`).
     """
     if run_id is None:
         run_id = _start_run(store, "reconcile")
@@ -153,6 +158,9 @@ async def reconcile(
     del names
     try:
         result = ReconcileResult(run_id, _scalar(store, "SELECT count(*) FROM temp.listed"))
+        with conn:
+            conn.execute("UPDATE runs SET count_list = ? WHERE id = ?", (result.count_list, run_id))
+        _gate("count_list", result.count_list, _count_stored(store), max_drop)
         missing = [
             r[0]
             for r in conn.execute(
@@ -300,6 +308,145 @@ async def incremental(
     return result
 
 
+class CountDrop(SchemaDrift):
+    """A count fell more than the drift gate allows against its baseline (SPEC §7)."""
+
+
+def _gate(what: str, count: int, baseline: int | None, max_drop: float) -> None:
+    if baseline and count < baseline * (1 - max_drop):
+        raise CountDrop(
+            f"{what} {count} is more than {max_drop:.0%} below {baseline}: aborting, nothing"
+            " soft-deleted",
+            status=200,
+        )
+
+
+async def probe(client: ProxyClient) -> int:
+    """Startup probe (SPEC §7): `package_search rows=1`; fail fast if the envelope drifted."""
+    try:
+        page = await client.action("package_search", rows=1)
+    except SchemaDrift as exc:
+        raise SchemaDrift(f"startup probe failed: {exc}", status=exc.status, path=exc.path) from exc
+    return int(page["count"])
+
+
+@dataclass
+class FullRun:
+    run_id: int
+    crawl: FullCrawlResult
+    reconcile: ReconcileResult
+
+
+async def run_full(
+    client: ProxyClient,
+    store: Store,
+    *,
+    page_size: int = PAGE_SIZE,
+    workers: int = WORKERS,
+    raw_dir: Path | None = None,
+    raw_keep: int = RAW_KEEP,
+    max_drop: float = MAX_DROP,
+) -> FullRun:
+    """Probe, gate, full crawl, then reconcile, under the run lock, as one `runs` row.
+
+    The most recent full run that did not finish `ok` is resumed from its checkpoint. A
+    `count_search` more than `max_drop` below the last ok full run (or, with none, the live
+    stored count) aborts before any page is fetched; any crawl error ends the run before
+    reconcile, so drift never soft-deletes.
+    """
+    resume = _unfinished_full(store)
+
+    async def body(run_id: int) -> FullRun:
+        count = await probe(client)
+        _gate("count_search", count, _search_baseline(store, run_id), max_drop)
+        crawl = await full_crawl(
+            client,
+            store,
+            run_id,
+            page_size=page_size,
+            workers=workers,
+            raw_dir=raw_dir,
+            raw_keep=raw_keep,
+        )
+        rec = await reconcile(client, store, run_id, workers=workers, max_drop=max_drop)
+        return FullRun(run_id, crawl, rec)
+
+    return await _supervised(store, "full", body, resume)
+
+
+async def run_incremental(
+    client: ProxyClient,
+    store: Store,
+    *,
+    page_size: int = PAGE_SIZE,
+    overlap: timedelta = OVERLAP,
+) -> IncrementalResult:
+    """Probe and incremental crawl under the run lock; `NeedsFullCrawl` writes no row."""
+    if watermark(store) is None:
+        raise NeedsFullCrawl("no stored packages: run a full crawl first")
+
+    async def body(run_id: int) -> IncrementalResult:
+        await probe(client)
+        return await incremental(client, store, run_id, page_size=page_size, overlap=overlap)
+
+    return await _supervised(store, "incremental", body)
+
+
+async def run_reconcile(
+    client: ProxyClient,
+    store: Store,
+    *,
+    workers: int = WORKERS,
+    max_drop: float = MAX_DROP,
+) -> ReconcileResult:
+    """Probe and `package_list` reconcile under the run lock (the weekly job)."""
+
+    async def body(run_id: int) -> ReconcileResult:
+        await probe(client)
+        return await reconcile(client, store, run_id, workers=workers, max_drop=max_drop)
+
+    return await _supervised(store, "reconcile", body)
+
+
+async def _supervised[T](
+    store: Store,
+    kind: str,
+    body: Callable[[int], Awaitable[T]],
+    resume: int | None = None,
+) -> T:
+    """Hold the lock, open (or reopen) the run row, and close it `ok` or `failed`."""
+    async with RunLock(store) as lock:
+        if resume is None:
+            run_id = _start_run(store, kind)
+        else:
+            run_id = resume
+            reopen_run(store, run_id)
+        lock.attach(run_id)
+        try:
+            result = await body(run_id)
+        except BaseException as exc:
+            finish_run(store, run_id, "failed", f"{type(exc).__name__}: {exc}")
+            raise
+        finish_run(store, run_id, "ok")
+        return result
+
+
+def _unfinished_full(store: Store) -> int | None:
+    row = store.conn.execute(
+        "SELECT id, status FROM runs WHERE kind = 'full' ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    return int(row[0]) if row is not None and row[1] != "ok" else None
+
+
+def _search_baseline(store: Store, run_id: int) -> int:
+    row = store.conn.execute(
+        "SELECT count_search FROM runs WHERE kind = 'full' AND status = 'ok' AND id != ?"
+        " AND count_search IS NOT NULL ORDER BY id DESC LIMIT 1",
+        (run_id,),
+    ).fetchone()
+    return int(row[0]) if row is not None else _count_stored(store)
+
+
 class _Frontier:
     """The first offset not yet covered by a contiguous run of finished pages."""
 
@@ -343,15 +490,7 @@ class _RawWriter:
 
 
 def _start_run(store: Store, kind: str = "full") -> int:
-    checkpoint = _checkpoint(0, PAGE_SIZE) if kind == "full" else None
-    with store.conn:
-        cur = store.conn.execute(
-            "INSERT INTO runs (kind, started_at, status, upserts, changed, errors, checkpoint)"
-            " VALUES (?, ?, 'running', 0, 0, 0, ?)",
-            (kind, store.now(), checkpoint),
-        )
-    assert cur.lastrowid is not None
-    return cur.lastrowid
+    return start_run(store, kind, _checkpoint(0, PAGE_SIZE) if kind == "full" else None)
 
 
 def _read_checkpoint(store: Store, run_id: int) -> int:

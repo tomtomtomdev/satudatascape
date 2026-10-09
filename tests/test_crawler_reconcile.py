@@ -109,7 +109,7 @@ async def test_items_inserted_mid_crawl_are_fetched_with_package_show(store: Sto
 
 @respx.mock
 async def test_a_name_no_longer_listed_is_soft_deleted(store: Store) -> None:
-    catalog = FakeCatalog(5)
+    catalog = FakeCatalog(20)  # one of 20 gone stays inside the 10% drift gate (S8)
     store.upsert_packages(catalog.packages)
     gone = catalog.packages.pop(2)
     respx.post(PROXY_URL).mock(side_effect=catalog)
@@ -118,8 +118,8 @@ async def test_a_name_no_longer_listed_is_soft_deleted(store: Store) -> None:
 
     assert (result.fetched, result.deleted) == (0, 1)
     assert deleted(store) == {gone["name"]: T0.isoformat()}
-    assert store.conn.execute("SELECT count(*) FROM packages").fetchone()[0] == 5  # kept
-    assert result.count_stored == 4
+    assert store.conn.execute("SELECT count(*) FROM packages").fetchone()[0] == 20  # kept
+    assert result.count_stored == 19
 
 
 @respx.mock

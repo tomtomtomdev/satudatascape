@@ -74,9 +74,10 @@ def test_migrations_are_idempotent_and_wal_is_on(tmp_path: Path) -> None:
     run_cols = {r[1] for r in second.conn.execute("PRAGMA table_info(runs)")}
     second.close()
 
-    assert applied == again == ["0001_init"]
+    assert applied == again == ["0001_init", "0002_runlock"]
     assert mode == "wal"
     assert {"packages", "resources", "organizations", "package_versions", "runs"} <= tables
+    assert "run_lock" in tables
     assert {"status", "error", "checkpoint"} <= run_cols
 
 
