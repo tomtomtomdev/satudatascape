@@ -376,7 +376,7 @@ Done when: tests pass.
 | Slice | Status | Date | Commit | Tests | Run showed |
 |-------|--------|------|--------|-------|------------|
 | S0 Project scaffold & CI | done | 2026-10-09 | f4fceb3 (+ ci fixes 9c9c81d, ff5071e) | 1 passed (smoke); `make check` green, docker skipped | `0.1.0`; uv 0.11.26, Python 3.12.12, SQLite 3.51.3. Amended *Commands* (`docker-maybe` also requires a Dockerfile) |
-| S1 Proxy client: envelope & errors | done | 2026-10-09 | | 16 new (`tests/test_client.py`) + 1 live; suite 17 passed, 1 deselected; `make check` green, docker skipped | `622223` (live `package_search rows=0`; plan said ~614k). Fixtures captured live, not hand-written |
+| S1 Proxy client: envelope & errors | done | 2026-10-09 | 9ce1b85 (CI 37893209335 green) | 16 new (`tests/test_client.py`) + 1 live; suite 17 passed, 1 deselected; `make check` green, docker skipped | `622223` (live `package_search rows=0`; plan said ~614k). Fixtures captured live, not hand-written |
 | S2 Proxy client: rate limit, retries, UA | todo | | | | |
 | S3 Normalisers | todo | | | | |
 | S4 Store: migrations + upsert | todo | | | | |
