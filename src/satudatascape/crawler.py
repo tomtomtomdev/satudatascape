@@ -1,4 +1,4 @@
-"""Catalogue crawler (SPEC §3.2): full crawl with a resumable checkpoint in `runs.checkpoint`."""
+"""Catalogue crawler (SPEC §3.2): resumable full crawl and the `package_list` reconcile."""
 
 import asyncio
 import gzip
@@ -10,12 +10,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from satudatascape.client import ProxyClient, SchemaDrift
-from satudatascape.store import Package, Store, canonical_json
+from satudatascape.client import ProxyClient, ProxyError, SchemaDrift
+from satudatascape.store import Package, Store, UpsertStats, canonical_json
 
 PAGE_SIZE = 1000  # the proxy caps `rows` at 1000 (SPEC §1.3)
 WORKERS = 4  # pages in flight; the client's own limits still apply
 RAW_KEEP = 3  # raw run directories kept by rotation
+LIST_BATCH = 50_000  # package_list names inserted per executemany
 _DAY_DIR = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -96,15 +97,115 @@ async def full_crawl(
     if errors:
         raise errors[0]
 
-    result.count_stored = int(
-        store.conn.execute("SELECT count(*) FROM packages WHERE deleted_at IS NULL").fetchone()[0]
-    )
+    result.count_stored = _count_stored(store)
     with store.conn:
         store.conn.execute(
             "UPDATE runs SET count_stored = ?, checkpoint = ? WHERE id = ?",
             (result.count_stored, _checkpoint(count, page_size), run_id),
         )
     return result
+
+
+@dataclass
+class ReconcileResult:
+    run_id: int
+    count_list: int
+    missing: int = 0  # listed but not stored (or soft-deleted)
+    fetched: int = 0  # missing ones `package_show` returned and were upserted
+    not_found: int = 0  # missing ones `package_show` answered `404 NOT FOUND`
+    deleted: int = 0  # stored but no longer listed → soft-deleted
+    count_stored: int = 0
+
+
+async def reconcile(
+    client: ProxyClient,
+    store: Store,
+    run_id: int | None = None,
+    *,
+    workers: int = WORKERS,
+    batch: int = LIST_BATCH,
+) -> ReconcileResult:
+    """Diff `package_list` names against the store (SPEC §3.2 step 4).
+
+    The names land in a temp table in batches and the diff runs in SQL. Listed names that are
+    not stored (or are soft-deleted) are fetched with `package_show` and upserted; a
+    `404 NOT FOUND` is skipped and counted. Only then are stored names that are no longer
+    listed soft-deleted, so a rename is an update, not a delete. Without `run_id` a
+    `runs(kind='reconcile')` row is created; finishing it is left to the caller (S8).
+    """
+    if run_id is None:
+        run_id = _start_run(store, "reconcile")
+    names = await client.action("package_list")
+    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+        raise SchemaDrift("package_list: result is not a list of names", status=200)
+    conn = store.conn
+    with conn:
+        conn.execute("DROP TABLE IF EXISTS temp.listed")
+        conn.execute("CREATE TEMP TABLE listed (name TEXT PRIMARY KEY) WITHOUT ROWID")
+        for i in range(0, len(names), batch):
+            conn.executemany(
+                "INSERT OR IGNORE INTO temp.listed VALUES (?)", ((n,) for n in names[i : i + batch])
+            )
+    del names
+    try:
+        result = ReconcileResult(run_id, _scalar(store, "SELECT count(*) FROM temp.listed"))
+        missing = [
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM temp.listed l WHERE NOT EXISTS (SELECT 1 FROM packages p"
+                " WHERE p.name = l.name AND p.deleted_at IS NULL) ORDER BY name"
+            )
+        ]
+        result.missing = len(missing)
+        stats = await _fetch_missing(client, store, missing, workers, result)
+        with conn:
+            result.deleted = conn.execute(
+                "UPDATE packages SET deleted_at = ? WHERE deleted_at IS NULL AND NOT EXISTS"
+                " (SELECT 1 FROM temp.listed l WHERE l.name = packages.name)",
+                (store.now(),),
+            ).rowcount
+        result.count_stored = _count_stored(store)
+        with conn:
+            conn.execute(
+                "UPDATE runs SET count_list = ?, count_stored = ?, upserts = upserts + ?,"
+                " changed = changed + ? WHERE id = ?",
+                (
+                    result.count_list,
+                    result.count_stored,
+                    result.fetched,
+                    stats.inserted + stats.changed,
+                    run_id,
+                ),
+            )
+    finally:
+        with conn:
+            conn.execute("DROP TABLE IF EXISTS temp.listed")
+    return result
+
+
+async def _fetch_missing(
+    client: ProxyClient,
+    store: Store,
+    missing: list[str],
+    workers: int,
+    result: ReconcileResult,
+) -> UpsertStats:
+    """`package_show` each name through the client's limits; upsert what comes back."""
+    pending = iter(missing)
+    found: list[Package] = []
+
+    async def worker() -> None:
+        while (name := next(pending, None)) is not None:
+            try:
+                found.append(await client.action("package_show", id=name))
+            except ProxyError as exc:
+                if "404 NOT FOUND" not in str(exc):
+                    raise
+                result.not_found += 1
+
+    await asyncio.gather(*(worker() for _ in range(workers)))
+    result.fetched = len(found)
+    return store.upsert_packages(found)
 
 
 class _Frontier:
@@ -149,12 +250,13 @@ class _RawWriter:
         part.replace(final)
 
 
-def _start_run(store: Store) -> int:
+def _start_run(store: Store, kind: str = "full") -> int:
+    checkpoint = _checkpoint(0, PAGE_SIZE) if kind == "full" else None
     with store.conn:
         cur = store.conn.execute(
             "INSERT INTO runs (kind, started_at, status, upserts, changed, errors, checkpoint)"
-            " VALUES ('full', ?, 'running', 0, 0, 0, ?)",
-            (store.now(), _checkpoint(0, PAGE_SIZE)),
+            " VALUES (?, ?, 'running', 0, 0, 0, ?)",
+            (kind, store.now(), checkpoint),
         )
     assert cur.lastrowid is not None
     return cur.lastrowid
@@ -166,6 +268,14 @@ def _read_checkpoint(store: Store, run_id: int) -> int:
         raise ValueError(f"no runs row with id {run_id}")
     state: dict[str, Any] = json.loads(row[0]) if row[0] else {}
     return int(state.get("next_start", 0))
+
+
+def _count_stored(store: Store) -> int:
+    return _scalar(store, "SELECT count(*) FROM packages WHERE deleted_at IS NULL")
+
+
+def _scalar(store: Store, sql: str) -> int:
+    return int(store.conn.execute(sql).fetchone()[0])
 
 
 def _run_day(store: Store, run_id: int) -> str:
