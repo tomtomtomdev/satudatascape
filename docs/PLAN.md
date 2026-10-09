@@ -375,7 +375,7 @@ Done when: tests pass.
 
 | Slice | Status | Date | Commit | Tests | Run showed |
 |-------|--------|------|--------|-------|------------|
-| S0 Project scaffold & CI | done | 2026-10-09 | | 1 passed (smoke); `make check` green, docker skipped | `0.1.0`; uv 0.11.26, Python 3.12.12, SQLite 3.51.3. Amended *Commands* (`docker-maybe` also requires a Dockerfile) |
+| S0 Project scaffold & CI | done | 2026-10-09 | f4fceb3 (+ ci fixes 9c9c81d, ff5071e) | 1 passed (smoke); `make check` green, docker skipped | `0.1.0`; uv 0.11.26, Python 3.12.12, SQLite 3.51.3. Amended *Commands* (`docker-maybe` also requires a Dockerfile) |
 | S1 Proxy client: envelope & errors | todo | | | | |
 | S2 Proxy client: rate limit, retries, UA | todo | | | | |
 | S3 Normalisers | todo | | | | |
@@ -413,6 +413,7 @@ Done when: tests pass.
 ## Notes log
 <!-- Each slice appends one line: `YYYY-MM-DD Sn — note` -->
 2026-10-09 S0 — uv package scaffold, all stack deps except pdfplumber locked (fastapi 0.143, httpx 0.28, pyarrow 25, apscheduler 3.x, mypy 2.4, ruff 0.16); `[project.scripts]` left for S9b; `docker-maybe` guard now also checks for a Dockerfile so CI stays green before S17; ruff excludes `scripts/feasibility/`.
+2026-10-09 S0 — CI: bumped to node24 action majors (checkout@v7, setup-uv@v10.2.0; setup-uv publishes no major tags, so it is pinned to the full tag). CI run 37892951137 green.
 
 ---
 
