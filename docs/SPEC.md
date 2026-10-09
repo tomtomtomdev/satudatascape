@@ -209,21 +209,31 @@ There's no need for Postgres, a queue, a separate SPA, or Kubernetes.
 
 **When to outgrow this:** more than ~10 concurrent writers, multiple app instances, or analytical queries over file contents. At that point, move to Postgres (keep SQL portable now: no SQLite-only types except FTS5, which is isolated behind a `search` module) and a separate worker process.
 
-Single-process layout:
+Single-process layout (kept in sync with PLAN.md *Where*):
 
 ```
-satudatascape/
+pyproject.toml  uv.lock  .python-version  Makefile  .github/workflows/ci.yml
+Dockerfile  docker-compose.yml  docs/DEPLOY.md  scripts/capture_fixtures.py
+src/satudatascape/
+  __init__.py      # __version__
+  config.py        # Settings, TOML + SDS_* env
   client.py        # ProxyClient
+  ratelimit.py     # TokenBucket (injected clock)
+  normalize.py     # format / org type / timestamps
+  store.py         # sqlite access, upsert, migrations runner
   crawler.py       # full / incremental / reconcile
-  downloader.py    # resource files
-  store.py         # sqlite access, upsert, FTS
-  scheduler.py     # APScheduler jobs + run lock
+  runs.py          # runs rows + run lock
+  search.py        # FTS5 + filters + facets (only SQLite-specific module)
   cli.py           # typer
+  downloader.py  urllint.py  sniff.py  select.py  pipeline.py
+  export.py  backup.py  scheduler.py
+  extract/{__init__,csv_,json_,xlsx}.py
+  migrations/0001_init.sql …   # loaded via importlib.resources
   web/
-    app.py         # FastAPI routes
+    app.py         # FastAPI factory
+    routes/{datasets,detail,orgs,stats,runs,links}.py
     templates/     # Jinja2 (+ HTMX partials)
     static/app.css
-migrations/0001_init.sql …
 tests/ (unit, fixtures/, web/)
 ```
 

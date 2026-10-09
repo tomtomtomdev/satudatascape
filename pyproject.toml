@@ -1,0 +1,66 @@
+[project]
+name = "satudatascape"
+version = "0.1.0"
+description = "Local mirror of the Satu Data Indonesia catalogue with a small web UI"
+readme = "README.md"
+authors = [
+    { name = "Tommy", email = "tommy.yohanes@icloud.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "apscheduler>=3.10,<4",
+    "fastapi>=0.143.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "openpyxl>=3.1.5",
+    "pyarrow>=25.0.1",
+    "python-multipart>=0.0.32",
+    "tenacity>=9.2.1",
+    "typer>=0.27.3",
+    "tzdata>=2026.5",
+    "uvicorn>=0.54.0",
+    "xlrd>=2.0.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+    "ruff>=0.16.10",
+    "types-openpyxl>=3.1.5.20260827",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["scripts/feasibility"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "ASYNC", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["xlrd", "xlrd.*", "pyarrow", "pyarrow.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-m 'not live and not slow' --strict-markers"
+filterwarnings = ["error"]
+markers = [
+    "live: hits the real data.go.id proxy (opt-in: make test-live)",
+    "slow: large synthetic-data perf tests (opt-in: make test-slow)",
+]

@@ -1,6 +1,6 @@
 # satudatascape — Implementation Plan
 
-Status: slicing done — next: S0
+Status: S0 done — next: S1
 Goal: A local mirror of the Satu Data Indonesia catalogue (and best-effort data files) with a small internal web UI, built slice by slice, test-first.
 
 Companion to [SPEC.md](SPEC.md). The work is split into small vertical slices.
@@ -121,7 +121,7 @@ Risks and how each is retired:
 
 ### Commands
 - **Test:** `make test` (= `uv run pytest`; `addopts = "-m 'not live and not slow'"`; `make test-slow` / `make test-live` opt in)
-- **Build / check:** `make check` = `lint` (`ruff check` + `ruff format --check`) + `typecheck` (`mypy src`) + `test` + `docker-maybe` (`docker info >/dev/null 2>&1 && docker build -t satudatascape . || echo "skip docker: no daemon"`; it's a no-op until S17 adds the Dockerfile)
+- **Build / check:** `make check` = `lint` (`ruff check` + `ruff format --check`) + `typecheck` (`mypy src`) + `test` + `docker-maybe` (builds only if a `Dockerfile` exists **and** `docker info` succeeds, else prints `skip docker: no Dockerfile or no daemon`; amended in S0: CI runners have a daemon, so the original daemon-only guard would fail CI until S17 adds the Dockerfile). Ruff excludes `scripts/feasibility/` (throwaway research scripts); pytest runs with `filterwarnings = error` and `--strict-markers`.
 - **Run:** `uv run satudatascape <cmd>` (CLI, from S9b); `uv run satudatascape serve` (UI, from S11); before S9b, `uv run python -c …` as each slice's Run line says. Never run a full live crawl from a slice.
 
 ---
@@ -375,7 +375,7 @@ Done when: tests pass.
 
 | Slice | Status | Date | Commit | Tests | Run showed |
 |-------|--------|------|--------|-------|------------|
-| S0 Project scaffold & CI | todo | | | | |
+| S0 Project scaffold & CI | done | 2026-10-09 | | 1 passed (smoke); `make check` green, docker skipped | `0.1.0`; uv 0.11.26, Python 3.12.12, SQLite 3.51.3. Amended *Commands* (`docker-maybe` also requires a Dockerfile) |
 | S1 Proxy client: envelope & errors | todo | | | | |
 | S2 Proxy client: rate limit, retries, UA | todo | | | | |
 | S3 Normalisers | todo | | | | |
@@ -412,6 +412,7 @@ Done when: tests pass.
 
 ## Notes log
 <!-- Each slice appends one line: `YYYY-MM-DD Sn — note` -->
+2026-10-09 S0 — uv package scaffold, all stack deps except pdfplumber locked (fastapi 0.143, httpx 0.28, pyarrow 25, apscheduler 3.x, mypy 2.4, ruff 0.16); `[project.scripts]` left for S9b; `docker-maybe` guard now also checks for a Dockerfile so CI stays green before S17; ruff excludes `scripts/feasibility/`.
 
 ---
 

@@ -3,3 +3,10 @@ data/
 __pycache__/
 *.pyc
 .DS_Store
+out/
+satudatascape.toml
+.env
+*.part
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
